@@ -59,7 +59,7 @@ rand = "0.8"
 rand_chacha = "0.3"
 
 # Optional CUDA
-cudarc = { version = "0.12", default-features = false, features = ["cuda-12040", "driver", "runtime"] }
+cudarc = { version = "0.19", default-features = false, features = ["cuda-12040", "driver", "runtime"] }
 
 # Async runtime + async traits (Sprint 3: RankTransport, DistributedSegmentIndex)
 tokio = { version = "1.40", features = ["sync", "macros", "rt-multi-thread", "time"] }
@@ -70,10 +70,10 @@ futures = "0.3"
 # explicitly version-pinned to a single compatible set; mismatched versions in the
 # opentelemetry ecosystem are a notorious source of build pain. Pinned to 0.27/0.26
 # (the last set with stable APIs before the 0.28 ecosystem refresh).
-tracing-opentelemetry = "0.27"
-opentelemetry = "0.26"
-opentelemetry_sdk = { version = "0.26", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.26", features = ["grpc-tonic"] }
+tracing-opentelemetry = "0.33"
+opentelemetry = "0.32"
+opentelemetry_sdk = { version = "0.32", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.32", features = ["grpc-tonic"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
