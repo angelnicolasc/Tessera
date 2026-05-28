@@ -1,0 +1,35 @@
+# DeepSeek-V4 reference configuration — placeholder.
+#
+# V4 introduces DeepSeek Sparse Attention (DSA) with two-tier compression (c4a and c128a) plus
+# a sliding-window region. The Tessera Sprint 0 codebase carries the `CompressionScheme::DsaHierarchical`
+# variant as a non_exhaustive enum entry; until the kernel layer lands, this file is documented
+# but inert. See ADR-0004 and `Research/architecture/reversion-tessera02.md`.
+
+[model]
+name = "deepseek-v4"
+# TODO(dsa): replace with c4a/c128a/swa constants once V4 specs are public. For now the
+# fields below let `TesseraConfig` parse the file under MLA semantics and emit a clear error
+# if instantiated.
+latent_dim = 512
+rope_key_dim = 64
+num_layers = 61
+num_heads = 128
+head_dim = 128
+
+[block]
+block_size_tokens = 64
+ckv_dtype = "bf16"
+
+[segment_index]
+hnsw_m = 32
+hnsw_ef_construction = 200
+hnsw_ef_search = 64
+similarity_threshold = 0.97
+hnsw_latency_budget_us = 500
+
+[kernel]
+backend = "auto"
+
+[runtime]
+device = 0
+gpu_memory_bytes = 42949672960

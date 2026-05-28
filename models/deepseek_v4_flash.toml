@@ -1,0 +1,67 @@
+# DeepSeek-V4-Flash configuration. Sources:
+#   - DeepSeek-V4 paper §4.2.1 Model Setups (dimensions)
+#   - DeepSeek-V4 paper §2.3 Hybrid Attention with CSA and HCA (semantics)
+#   - DeepSeek-V4 paper §3.5.1 KV Cache Structure (block layout)
+#
+# V4-Flash: 284B total params, 13B activated.
+# 43 transformer layers, first 2 pure SWA, remainder interleave CSA/HCA.
+
+[model]
+name = "deepseek-v4-flash"
+# latent_dim/rope_key_dim are 0/0 because V4 uses the per-layer [v4] block instead of MLA.
+latent_dim = 0
+rope_key_dim = 0
+num_layers = 43
+num_heads = 64
+head_dim = 512
+
+[block]
+# lcm(k1=4, k2=128) = 128. Block holds 32 CSA entries + 1 HCA entry per layer.
+block_size_tokens = 128
+ckv_dtype = "mixed_bf16_fp8_fp4"
+
+[v4]
+k1 = 4
+k2 = 128
+head_dim = 512
+rope_dim = 64                # last 64 dims in BF16
+indexer_head_dim = 128       # Lightning Indexer head dim
+num_indexer_heads = 64
+top_k = 512                  # sparse top-k for CSA's DSA selector
+swa_window = 128
+# 43-layer pattern: 2 SWA + 41 alternating CSA/HCA (starting with CSA).
+layer_pattern = [
+    "swa", "swa",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa",
+]
+
+[segment_index]
+hnsw_m = 32
+hnsw_ef_construction = 200
+hnsw_ef_search = 64
+similarity_threshold = 0.97
+hnsw_latency_budget_us = 500
+
+[kernel]
+backend = "auto"
+# softmax_scale = 1 / sqrt(d_h - rope_dim) = 1 / sqrt(512 - 64) = 1 / sqrt(448) ≈ 0.04725
+softmax_scale = 0.04725
+
+[runtime]
+device = 0
+# Memory budget for 1M-token context. Paper §2.3.4: V4 KV cache is ~2% of GQA8-BF16 baseline.
+gpu_memory_bytes = 8589934592   # 8 GiB
+
+[observability]
+prometheus_port = 9090
+tracing_endpoint = ""
+
+[disk_cache]
+enabled = false
+swa_strategy = "periodic"
+swa_checkpoint_interval_tokens = 4096

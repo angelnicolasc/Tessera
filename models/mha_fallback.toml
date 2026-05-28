@@ -1,0 +1,29 @@
+# MHA fallback. `latent_dim=0` selects `CompressionScheme::MhaFull` and relaxes the 64-token
+# block-size constraint. Used when serving non-MLA models behind the Tessera plugin so the
+# segment index and cross-agent share table continue to work.
+
+[model]
+name = "mha-fallback"
+latent_dim = 0
+rope_key_dim = 0
+num_layers = 32
+num_heads = 32
+head_dim = 128
+
+[block]
+block_size_tokens = 16
+ckv_dtype = "bf16"
+
+[segment_index]
+hnsw_m = 16
+hnsw_ef_construction = 100
+hnsw_ef_search = 32
+similarity_threshold = 0.97
+hnsw_latency_budget_us = 500
+
+[kernel]
+backend = "triton"
+
+[runtime]
+device = 0
+gpu_memory_bytes = 16106127360   # 15 GiB

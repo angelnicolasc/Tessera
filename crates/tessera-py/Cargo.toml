@@ -1,0 +1,34 @@
+[package]
+name = "tessera-py"
+description = "PyO3 bindings exposing the Tessera Rust core to Python (module: tessera._native)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# Forwards the optional CUDA backend through PyO3. Requires `tessera-core/cuda`.
+cuda = ["tessera-core/cuda"]
+
+[dependencies]
+tessera-core.workspace = true
+tessera-index.workspace = true
+pyo3.workspace = true
+numpy.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

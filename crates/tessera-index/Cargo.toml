@@ -1,0 +1,33 @@
+[package]
+name = "tessera-index"
+description = "Pluggable ANN segment index for Tessera. Trait + usearch HNSW implementation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tessera-core.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+usearch.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
+rand_chacha.workspace = true
+tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread", "time", "test-util"] }

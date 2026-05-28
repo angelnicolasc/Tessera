@@ -1,0 +1,66 @@
+# DeepSeek-V4-Pro configuration. Sources:
+#   - DeepSeek-V4 paper §4.2.1 Model Setups (dimensions)
+#   - DeepSeek-V4 paper §2.3 Hybrid Attention with CSA and HCA (semantics)
+#   - DeepSeek-V4 paper §3.5.1 KV Cache Structure (block layout)
+#
+# V4-Pro: 1.6T total params, 49B activated.
+# 61 transformer layers, first 2 HCA, remainder interleave CSA/HCA.
+
+[model]
+name = "deepseek-v4-pro"
+latent_dim = 0
+rope_key_dim = 0
+num_layers = 61
+num_heads = 128
+head_dim = 512
+
+[block]
+block_size_tokens = 128
+ckv_dtype = "mixed_bf16_fp8_fp4"
+
+[v4]
+k1 = 4
+k2 = 128
+head_dim = 512
+rope_dim = 64
+indexer_head_dim = 128
+num_indexer_heads = 64
+top_k = 1024                 # V4-Pro uses larger top-k for sparse selection
+swa_window = 128
+# 61-layer pattern: 2 HCA + 59 alternating CSA/HCA (starting with CSA).
+layer_pattern = [
+    "hca", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa", "hca", "csa", "hca", "csa", "hca",
+    "csa", "hca", "csa",
+]
+
+[segment_index]
+hnsw_m = 32
+hnsw_ef_construction = 200
+hnsw_ef_search = 64
+similarity_threshold = 0.97
+hnsw_latency_budget_us = 500
+
+[kernel]
+backend = "auto"
+softmax_scale = 0.04725
+
+[runtime]
+device = 0
+# Pro deployment typically multi-GPU (TP=8); per-rank memory budget.
+gpu_memory_bytes = 42949672960   # 40 GiB
+
+[observability]
+prometheus_port = 9090
+tracing_endpoint = ""
+
+[disk_cache]
+enabled = false
+swa_strategy = "periodic"
+swa_checkpoint_interval_tokens = 4096

@@ -1,0 +1,84 @@
+[package]
+name = "tessera-core"
+description = "MLA-aware KV block manager core: allocation, content-addressed dedup, copy-on-write sharing."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# Enables real CUDA backend via cudarc + P2pCudaTransport stub. Without this feature,
+# CpuMockBackend is the only impl and the CUDA transport variant is excluded entirely.
+cuda = ["dep:cudarc"]
+# Cables in NcclTransport stub for multi-node (Sprint 4 runtime impl). Sprint 3 ships
+# compile-only validation behind this flag; no extra deps activated yet.
+nccl = []
+# Sprint 4: wires up the Rust `tracing-opentelemetry` bridge so Rust-side spans export
+# to the same OTLP endpoint as the Python layer. Default-off: the OTel ecosystem is a
+# heavy build dep (tonic/protobuf/ring) and not every deployment wants it. Operators
+# enable via `cargo build --features otel-rust`.
+otel-rust = [
+    "dep:tracing-opentelemetry",
+    "dep:opentelemetry",
+    "dep:opentelemetry_sdk",
+    "dep:opentelemetry-otlp",
+]
+# Enables test-only helpers like fill_test_pattern on production backends.
+testing = []
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+dashmap.workspace = true
+parking_lot.workspace = true
+xxhash-rust.workspace = true
+serde.workspace = true
+prometheus.workspace = true
+lazy_static.workspace = true
+cudarc = { workspace = true, optional = true }
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+# Sprint 4: deterministic chaos injection (LatencyInjector). Production-grade — operators
+# can use it in staging to surface race conditions before they hit live traffic.
+rand.workspace = true
+rand_chacha.workspace = true
+# Sprint 4 (feature `otel-rust`): OTLP tracing bridge. Optional — see [features].
+tracing-opentelemetry = { workspace = true, optional = true }
+opentelemetry = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+opentelemetry-otlp = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+criterion.workspace = true
+tracing-subscriber.workspace = true
+tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread", "time", "test-util"] }
+# Sprint 5: tempdir fixtures for DiskBackend tests
+tempfile = "3.13"
+
+[[bench]]
+name = "alloc_throughput"
+harness = false
+
+[[bench]]
+name = "hash_throughput"
+harness = false
+
+[[bench]]
+name = "share_table_concurrency"
+harness = false

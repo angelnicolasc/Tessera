@@ -1,0 +1,34 @@
+# Tessera canonical configuration. Copy to `tessera.toml` and edit per deployment.
+# Values shown are tuned for DeepSeek-V3 (61 layers, d_c=512, d_r=64).
+
+[model]
+name = "deepseek-v3"
+latent_dim = 512          # d_c — MLA latent dimension
+rope_key_dim = 64         # d_r — decoupled RoPE key dimension
+num_layers = 61           # L
+num_heads = 128           # H (validation only; not stored)
+head_dim = 128            # d_h (validation only)
+
+[block]
+block_size_tokens = 64    # MUST be 64 to match FlashMLA's native paged block size
+ckv_dtype = "bf16"        # "bf16" | "fp8_e4m3" (fp8 requires calibration)
+
+[segment_index]
+hnsw_m = 32
+hnsw_ef_construction = 200
+hnsw_ef_search = 64        # raise for recall, lower for latency
+similarity_threshold = 0.97
+hnsw_latency_budget_us = 500   # async, off-hot-path; miss-on-timeout is safe
+
+[kernel]
+# "auto" picks FlashMLA on Hopper/Blackwell, FlashInfer on Ampere+, Triton fallback.
+backend = "auto"
+softmax_scale = 0.0441941738   # 1 / sqrt(d_c=512)
+
+[runtime]
+device = 0                 # CUDA device ordinal
+gpu_memory_bytes = 42949672960   # 40 GiB; tune to your card
+
+[observability]
+prometheus_port = 9090
+tracing_endpoint = ""      # OTLP gRPC endpoint, e.g. "http://localhost:4317"
