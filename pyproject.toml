@@ -1,0 +1,157 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "tessera"
+version = "0.1.0"
+description = "MLA-aware KV block manager for multi-agent inference (vLLM V1 plugin)"
+readme = "README.md"
+license = { text = "MIT OR Apache-2.0" }
+requires-python = ">=3.11"
+authors = [{ name = "Tessera Contributors" }]
+keywords = ["mla", "kv-cache", "inference", "vllm", "deepseek", "multi-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Hardware",
+]
+dependencies = [
+    "pydantic>=2.7",
+    "numpy>=1.26",
+    "xxhash>=3.4",
+    "usearch>=2.12",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.4"]
+vllm = ["vllm>=0.6"]
+flashinfer = ["flashinfer>=0.2"]
+flash-mla = ["flash-mla"]
+observability = [
+    "prometheus-client>=0.21",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.112",   # Sprint 4: boundary fuzz at the Python ↔ Rust seam
+    "ruff>=0.7",
+    "pyright>=1.1.388",
+    "maturin>=1.7",
+    "pip-audit>=2.7",
+]
+docs = ["mdbook>=0.4"]
+all = ["tessera[torch,vllm,flashinfer,observability,dev]"]
+
+[project.urls]
+Homepage = "https://angelnicolasc.github.io/tessera"
+Repository = "https://github.com/angelnicolasc/tessera"
+Documentation = "https://angelnicolasc.github.io/tessera"
+Issues = "https://github.com/angelnicolasc/tessera/issues"
+Changelog = "https://github.com/angelnicolasc/tessera/blob/main/CHANGELOG.md"
+
+# Registers Tessera's BlockAllocator with vLLM's V1 plugin system.
+# vLLM discovers it via importlib.metadata.entry_points(group="vllm.block_allocator").
+[project.entry-points."vllm.block_allocator"]
+tessera = "tessera.vllm_plugin:TesseraBlockAllocator"
+
+[tool.maturin]
+module-name = "tessera._native"
+python-source = "python"
+manifest-path = "crates/tessera-py/Cargo.toml"
+features = ["pyo3/extension-module"]
+strip = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["python", "tests", "benchmarks"]
+extend-exclude = ["docs/book", "target"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "ANN",  # flake8-annotations
+    "S",    # flake8-bandit
+    "A",    # flake8-builtins
+    "RET",  # flake8-return
+    "SIM",  # flake8-simplify
+    "PL",   # pylint
+    "RUF",  # ruff-specific
+    "PT",   # flake8-pytest-style
+    "PERF", # perflint
+    "D",    # pydocstyle
+]
+ignore = [
+    "D100", "D104",         # public module / package docstrings
+    "D203", "D213",          # docstring style conflicts
+    "ANN101", "ANN102",      # self / cls
+    "PLR0913",               # too many arguments
+    "S101",                  # assert in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN", "S", "PLR2004"]
+"benchmarks/**" = ["D", "ANN", "S", "PLR2004", "T201"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pyright]
+include = ["python", "tests"]
+exclude = ["**/__pycache__", "**/.pytest_cache", "target", "docs/book"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "warning"
+reportPrivateUsage = "warning"
+reportUnknownMemberType = "none"     # PyO3 native module is opaque without stubs
+reportUnknownVariableType = "none"
+reportMissingImports = "warning"     # optional deps (torch/vllm/flashinfer)
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+]
+markers = [
+    "gpu: requires a CUDA-capable GPU (skipped on CPU-only runners)",
+    "slow: long-running tests",
+    "integration: cross-component tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["python/tessera"]
+omit = ["python/tessera/_native.pyi"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
