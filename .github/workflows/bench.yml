@@ -38,7 +38,7 @@ jobs:
 
       # Restore the baseline saved from the previous successful run on main.
       - name: Restore bench baseline
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: target/criterion
           key: bench-baseline-${{ github.ref_name }}
@@ -91,7 +91,7 @@ jobs:
       # Promote current baseline to stored baseline on main-branch success.
       - name: Save bench baseline
         if: github.ref == 'refs/heads/main' && success()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: target/criterion
           key: bench-baseline-main
