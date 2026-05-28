@@ -1,0 +1,59 @@
+# Rust
+/target/
+**/target/
+Cargo.lock.bak
+*.rs.bk
+*.pdb
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Maturin
+wheels/
+*.whl
+
+# mdBook
+docs/book/
+
+# Editors / OS
+.idea/
+.vscode/
+!.vscode/settings.json.example
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Local secrets
+.env
+.env.local
+*.local
+
+# Generated
+benchmarks/results/
+
+# Internal development
+Research/
+DEVLOG.md

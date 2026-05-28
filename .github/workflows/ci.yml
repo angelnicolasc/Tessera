@@ -1,0 +1,210 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  lint-rust:
+    name: Lint Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test-rust:
+    name: Test Rust (${{ matrix.os }} / ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        toolchain: ["1.82.0"]
+        include:
+          - os: ubuntu-latest
+            toolchain: stable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test
+        run: cargo test --workspace
+      - name: cargo bench --no-run
+        run: cargo bench --workspace --no-run
+
+  lint-python:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install lint tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pyright pydantic numpy
+      - name: ruff check
+        run: ruff check python tests benchmarks
+      - name: ruff format
+        run: ruff format --check python tests benchmarks
+      - name: pyright
+        run: pyright python tests
+
+  test-python:
+    name: Test Python (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install maturin and dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin pytest pytest-asyncio hypothesis pydantic numpy xxhash usearch
+      - name: maturin develop
+        run: maturin develop -m crates/tessera-py/Cargo.toml --release
+      - name: pytest
+        run: pytest tests -v -m "not gpu"
+
+  build-wheel:
+    name: Build wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install maturin
+        run: pip install maturin
+      - name: Build sdist + wheel
+        run: maturin build --release --sdist -m crates/tessera-py/Cargo.toml
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: target/wheels/*
+
+  build-cuda:
+    name: Build CUDA (compile-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cuda
+      - name: Install CUDA toolkit 12.4
+        uses: Jimver/cuda-toolkit@v0.2.18
+        with:
+          cuda: "12.4.0"
+          method: network
+          sub-packages: '["nvcc", "toolkit"]'
+      - name: cargo build --features cuda
+        run: cargo build --workspace --features cuda
+        env:
+          # cudarc links against libcuda.so at runtime; stub satisfies the linker at build time.
+          RUSTFLAGS: "-Dwarnings"
+
+  build-nccl:
+    name: Build NCCL feature (compile-only, Sprint 3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: nccl
+      - name: cargo build --features nccl
+        # The nccl feature in Sprint 3 is compile-only (NcclTransport stubs return
+        # structured errors at runtime). No NCCL runtime install required for this gate.
+        run: cargo build --workspace --features nccl
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+  test-multirank-python:
+    name: Multi-rank Python E2E (Sprint 3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: multirank-py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin pytest pytest-asyncio hypothesis pydantic numpy xxhash usearch
+          maturin develop -m crates/tessera-py/Cargo.toml --release
+      - name: pytest tests/multirank
+        run: pytest tests/multirank -v -m "not gpu"
+      - name: pytest tests/test_hypothesis_*
+        run: pytest tests/test_hypothesis_allocator.py tests/test_hypothesis_distributed.py -v
+
+  build-otel-rust:
+    name: Build OTel-Rust feature (compile-only, Sprint 4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: otel-rust
+      - name: cargo build --features otel-rust
+        # The otel-rust feature pulls in the opentelemetry ecosystem (tonic, ring, prost);
+        # the dep version set is pinned in the workspace Cargo.toml. This job validates the
+        # pin survives every push — the OTel ecosystem is known for breaking minor bumps.
+        run: cargo build --workspace --features otel-rust
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+  ci-gate:
+    name: CI gate
+    needs:
+      - lint-rust
+      - test-rust
+      - lint-python
+      - test-python
+      - build-wheel
+      - build-cuda
+      - build-nccl
+      - build-otel-rust
+      - test-multirank-python
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All required jobs passed."

@@ -1,0 +1,36 @@
+# Build artifacts — never needed in the image context
+target/
+dist/
+wheelhouse/
+
+# Version control
+.git/
+.github/
+
+# Documentation build output
+docs/book/
+docs/src/
+
+# Python byte-code and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Test and benchmark data
+tests/
+benchmarks/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Rust dev files (not needed for the build; Cargo.toml/lock are needed)
+*.profraw

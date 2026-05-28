@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose a change or addition.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? Who hits it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: What change do you propose, at the API or architectural level?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about? Why reject them?
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer is affected?
+      multiple: true
+      options:
+        - tessera-core (Rust)
+        - tessera-index (Rust)
+        - tessera-py (PyO3)
+        - python/tessera (orchestration)
+        - vLLM plugin
+        - Docs / ADR
+        - CI / build
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: adr
+    attributes:
+      label: ADR
+      options:
+        - label: This change is significant enough that I'm willing to write or update an ADR.

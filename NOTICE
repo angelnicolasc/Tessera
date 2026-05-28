@@ -1,0 +1,25 @@
+Tessera — MLA-Aware KV Block Manager for Multi-Agent Inference
+Copyright 2026 Tessera Contributors
+
+This product is licensed under the MIT License OR the Apache License 2.0
+at your option. See LICENSE-MIT and LICENSE-APACHE.
+
+This product builds on the following third-party works:
+
+  * DeepSeek-AI FlashMLA (MIT) — Hopper/Blackwell-optimised MLA decoding kernel.
+    https://github.com/deepseek-ai/FlashMLA
+
+  * FlashInfer (Apache-2.0) — paged attention kernels including MLA backend.
+    https://github.com/flashinfer-ai/flashinfer
+
+  * vLLM (Apache-2.0) — serving framework integration target (V1 engine).
+    https://github.com/vllm-project/vllm
+
+  * usearch (Apache-2.0) — incremental HNSW ANN index.
+    https://github.com/unum-cloud/usearch
+
+  * xxhash-rust (BSD-2-Clause) — xxhash3 implementation.
+    https://github.com/DoumanAsh/xxhash-rust
+
+These dependencies are required at run time but are not bundled in this
+source distribution. See their respective repositories for license terms.

@@ -1,0 +1,15 @@
+[build]
+# `cargo build --timings` integration; otherwise default.
+
+[target.'cfg(all())']
+rustflags = []
+
+# Benches benefit from native CPU codegen. Toggle on locally; do not set in CI to keep artifacts portable.
+# [target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))']
+# rustflags = ["-C", "target-cpu=native"]
+
+[alias]
+xtest = "test --workspace --all-features"
+xclippy = "clippy --workspace --all-targets --all-features -- -D warnings"
+xfmt = "fmt --all"
+xbench = "bench --workspace"

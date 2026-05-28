@@ -1,0 +1,19 @@
+# Default reviewer for any unmatched path.
+*                                       @angelnicolasc
+
+# Rust core gets stricter ownership.
+/crates/                                @angelnicolasc
+/crates/tessera-core/                   @angelnicolasc
+/crates/tessera-index/                  @angelnicolasc
+/crates/tessera-py/                     @angelnicolasc
+
+# Python orchestration.
+/python/                                @angelnicolasc
+
+# Docs and ADRs require sign-off from a maintainer.
+/docs/                                  @angelnicolasc
+/ARCHITECTURE.md                        @angelnicolasc
+/README.md                              @angelnicolasc
+
+# CI / release pipeline.
+/.github/                               @angelnicolasc

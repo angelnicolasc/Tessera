@@ -1,0 +1,149 @@
+name: Nightly Bench
+
+on:
+  schedule:
+    # 04:00 UTC every night — low-traffic window.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      open_issue_on_regression:
+        description: "Open a GitHub issue if regression detected"
+        type: boolean
+        default: true
+
+concurrency:
+  group: bench
+  cancel-in-progress: false   # never cancel a bench run mid-flight
+
+env:
+  CARGO_TERM_COLOR: always
+  REGRESSION_THRESHOLD: "20"  # percent — alert if any bench regresses by more than this
+
+jobs:
+  bench-rust:
+    name: Criterion regression (CPU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for baseline comparison
+
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-criterion
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-criterion
+
+      # Restore the baseline saved from the previous successful run on main.
+      - name: Restore bench baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: target/criterion
+          key: bench-baseline-${{ github.ref_name }}
+          restore-keys: bench-baseline-main
+
+      # Run benchmarks and save output as JSON.
+      - name: Run benchmarks
+        run: |
+          cargo bench --workspace -- --save-baseline current 2>&1 | tee bench-output.txt
+
+      # Compare against the restored baseline; fail + open issue on >REGRESSION_THRESHOLD% slowdown.
+      - name: Check for regressions
+        id: check_regression
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, sys, json
+
+          threshold = float(os.environ.get("REGRESSION_THRESHOLD", "20"))
+          text = open("bench-output.txt").read()
+
+          # Criterion emits lines like:  "foo/bar  time: [...] 1.2345 µs  [+15.00% +17.23% +19.44%]"
+          # The last group is (lb%, median%, ub%) change vs baseline. We key on median.
+          pattern = re.compile(
+              r"^(\S.+?)\s+time:.*?\[([+-]\d+\.\d+)%\s+([+-]\d+\.\d+)%\s+([+-]\d+\.\d+)%\]",
+              re.MULTILINE,
+          )
+          regressions = []
+          for m in pattern.finditer(text):
+              bench_name = m.group(1).strip()
+              median_pct = float(m.group(3))
+              if median_pct > threshold:
+                  regressions.append((bench_name, median_pct))
+
+          if regressions:
+              print(f"REGRESSIONS DETECTED (threshold >{threshold}%):")
+              for name, pct in regressions:
+                  print(f"  {name}: +{pct:.2f}%")
+              # Write summary for issue body.
+              with open("regression_summary.txt", "w") as f:
+                  f.write(f"## Bench regression detected (>{threshold}% slowdown)\n\n")
+                  f.write("| Benchmark | Change |\n|---|---|\n")
+                  for name, pct in regressions:
+                      f.write(f"| `{name}` | +{pct:.2f}% |\n")
+                  f.write("\nFull log: see workflow run artifacts.\n")
+              sys.exit(1)
+          else:
+              print("No regressions detected.")
+          PYEOF
+
+      # Promote current baseline to stored baseline on main-branch success.
+      - name: Save bench baseline
+        if: github.ref == 'refs/heads/main' && success()
+        uses: actions/cache/save@v4
+        with:
+          path: target/criterion
+          key: bench-baseline-main
+
+      # Upload raw bench output as artifact (always, for forensics).
+      - name: Upload bench artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-output-${{ github.run_id }}
+          path: |
+            bench-output.txt
+            regression_summary.txt
+          if-no-files-found: ignore
+
+      # Open a GitHub issue when a regression is detected (nightly only, not workflow_dispatch).
+      - name: Open regression issue
+        if: |
+          failure() &&
+          steps.check_regression.outcome == 'failure' &&
+          (github.event_name == 'schedule' || inputs.open_issue_on_regression == 'true')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## Benchmark regression detected\n\nSee workflow run for details.';
+            try { body = fs.readFileSync('regression_summary.txt', 'utf8'); } catch {}
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              title: `[bench] Regression detected on ${new Date().toISOString().slice(0,10)}`,
+              body,
+              labels: ['performance', 'regression'],
+            });
+
+  bench-python:
+    name: Python benchmark smoke-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin pydantic numpy xxhash usearch
+          maturin develop -m crates/tessera-py/Cargo.toml --release
+      - name: sharing_bench (smoke)
+        run: python -m benchmarks.sharing_bench
+      - name: memory_report (smoke)
+        run: python -m benchmarks.memory_report

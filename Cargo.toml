@@ -1,0 +1,109 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tessera-core",
+    "crates/tessera-index",
+    "crates/tessera-py",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+authors = ["Tessera Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/angelnicolasc/tessera"
+homepage = "https://angelnicolasc.github.io/tessera"
+documentation = "https://angelnicolasc.github.io/tessera"
+readme = "README.md"
+keywords = ["mla", "kv-cache", "inference", "vllm", "deepseek"]
+categories = ["memory-management", "science", "concurrency"]
+
+[workspace.dependencies]
+# Internal crates
+tessera-core = { path = "crates/tessera-core", version = "0.1.0" }
+tessera-index = { path = "crates/tessera-index", version = "0.1.0" }
+
+# Core
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Concurrency primitives
+dashmap = "5.5"
+parking_lot = "0.12"
+
+# Hashing
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# Metrics
+prometheus = "0.13"
+lazy_static = "1.5"
+
+# ANN
+usearch = "2.12"
+
+# Python bindings
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py311"] }
+numpy = "0.22"
+
+# Test / bench
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"
+rand = "0.8"
+rand_chacha = "0.3"
+
+# Optional CUDA
+cudarc = { version = "0.12", default-features = false, features = ["cuda-12040", "driver", "runtime"] }
+
+# Async runtime + async traits (Sprint 3: RankTransport, DistributedSegmentIndex)
+tokio = { version = "1.40", features = ["sync", "macros", "rt-multi-thread", "time"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Sprint 4: optional OTLP tracing bridge for the Rust core. All four crates are
+# explicitly version-pinned to a single compatible set; mismatched versions in the
+# opentelemetry ecosystem are a notorious source of build pain. Pinned to 0.27/0.26
+# (the last set with stable APIs before the 0.28 ecosystem refresh).
+tracing-opentelemetry = "0.27"
+opentelemetry = "0.26"
+opentelemetry_sdk = { version = "0.26", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.26", features = ["grpc-tonic"] }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# Style relaxations that conflict with engineering pragmatism:
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+multiple_crate_versions = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+strip = "symbols"
+panic = "abort"
+
+[profile.bench]
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+
+[profile.dev]
+opt-level = 0
+debug = true
