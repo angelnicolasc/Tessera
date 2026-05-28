@@ -27,7 +27,7 @@ dependencies = [
     "pydantic>=2.7",
     "numpy>=1.26",
     "xxhash>=3.4",
-    "usearch>=2.12",
+    "usearch>=2.25.3",
 ]
 
 [project.optional-dependencies]
