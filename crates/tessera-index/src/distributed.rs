@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::future::FutureExt;
-use tessera_core::block::{BlockId, GlobalBlockId};
+use tessera_core::block::GlobalBlockId;
 use tessera_core::rank::{LatencyTier, RankId, World};
 use tessera_core::transport::RankTransport;
 

@@ -2,9 +2,7 @@
 
 use std::collections::HashSet;
 
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 fn ds_v3_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
@@ -26,8 +24,8 @@ fn allocate_then_free_returns_to_pool() {
     let initial = mgr.total_blocks();
     assert!(initial > 0, "block budget must yield at least one block");
 
-    let ids: Vec<_> = (0..10)
-        .map(|i| mgr.allocate(u64::from(i), TokenRange::new(0, 64)).unwrap())
+    let ids: Vec<_> = (0u64..10)
+        .map(|i| mgr.allocate(i, TokenRange::new(0, 64)).unwrap())
         .collect();
     assert_eq!(mgr.used_blocks(), 10);
     assert_eq!(ids.iter().copied().collect::<HashSet<_>>().len(), 10);
@@ -48,7 +46,10 @@ fn oom_returns_typed_error() {
     }
     // Next attempt must fail with the structured error.
     let err = mgr.allocate(1, TokenRange::new(0, 64)).unwrap_err();
-    assert!(matches!(err, tessera_core::TesseraError::OutOfBlocks { .. }));
+    assert!(matches!(
+        err,
+        tessera_core::TesseraError::OutOfBlocks { .. }
+    ));
 }
 
 #[test]

@@ -165,10 +165,9 @@ impl CudaXxh3Hasher {
 impl ContentHasher for CudaXxh3Hasher {
     fn hash(&self, bytes: &[u8]) -> u64 {
         // Stub: byte-position-weighted sum. Deterministic but not xxhash3. Sprint 3 replaces.
-        bytes
-            .iter()
-            .enumerate()
-            .fold(0u64, |acc, (i, &b)| acc.wrapping_add(u64::from(b).wrapping_mul(i as u64 + 1)))
+        bytes.iter().enumerate().fold(0u64, |acc, (i, &b)| {
+            acc.wrapping_add(u64::from(b).wrapping_mul(i as u64 + 1))
+        })
     }
 
     fn name(&self) -> &'static str {

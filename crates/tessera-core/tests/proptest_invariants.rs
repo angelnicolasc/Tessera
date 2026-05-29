@@ -6,13 +6,14 @@
 //! about statically.
 
 use proptest::prelude::*;
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 fn small_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 32, rope_key_dim: 8 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 32,
+            rope_key_dim: 8,
+        },
         4,
         64,
         CkvDtype::Bf16,

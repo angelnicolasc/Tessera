@@ -2,10 +2,11 @@
 //! the per-block bookkeeping cost; real-CUDA numbers will be lower because of the device
 //! allocator, but the relative shape of the curve should match.
 
+// criterion's macros expand to undocumented pub items; suppress missing_docs for benches.
+#![allow(missing_docs)]
+
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 fn cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(

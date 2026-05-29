@@ -38,7 +38,6 @@ impl UsearchConfig {
 }
 
 /// `usearch`-backed segment index. Thread-safe.
-#[derive(Debug)]
 pub struct UsearchIndex {
     index: Mutex<Index>,
     dimensions: usize,
@@ -47,6 +46,18 @@ pub struct UsearchIndex {
     next_label: AtomicU64,
     label_for_block: RwLock<std::collections::HashMap<u32, u64>>,
     block_for_label: RwLock<std::collections::HashMap<u64, u32>>,
+}
+
+// `usearch::Index` does not implement `Debug` (the upstream crate omits it on purpose —
+// the C++ shim holds raw FFI handles). Custom impl skips the inner index and reports
+// only the metadata fields, which is all callers need.
+impl std::fmt::Debug for UsearchIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UsearchIndex")
+            .field("dimensions", &self.dimensions)
+            .field("next_label", &self.next_label)
+            .finish_non_exhaustive()
+    }
 }
 
 impl UsearchIndex {
@@ -63,7 +74,9 @@ impl UsearchIndex {
         };
         let index = Index::new(&options).context("failed to construct usearch index")?;
         // Reserve a modest initial capacity; grows automatically.
-        index.reserve(1024).context("failed to reserve usearch capacity")?;
+        index
+            .reserve(1024)
+            .context("failed to reserve usearch capacity")?;
         Ok(Self {
             index: Mutex::new(index),
             dimensions: config.dimensions,
@@ -109,7 +122,9 @@ impl IndexBackend for UsearchIndex {
             if index.size() == 0 {
                 return Ok(Vec::new());
             }
-            index.search(descriptor, k).context("usearch search failed")?
+            index
+                .search(descriptor, k)
+                .context("usearch search failed")?
         };
         let block_for_label = self.block_for_label.read();
         let mut out = Vec::with_capacity(matches.keys.len());
@@ -117,7 +132,10 @@ impl IndexBackend for UsearchIndex {
             if let Some(&block_id) = block_for_label.get(label) {
                 // usearch's Cos metric returns DISTANCE = 1 - cosine_similarity. Convert.
                 let similarity = 1.0 - *dist;
-                out.push(IndexMatch { block_id, similarity });
+                out.push(IndexMatch {
+                    block_id,
+                    similarity,
+                });
             }
         }
         Ok(out)
@@ -145,8 +163,8 @@ impl IndexBackend for UsearchIndex {
 
 #[cfg(test)]
 mod tests {
-    use rand::SeedableRng;
     use rand::Rng;
+    use rand::SeedableRng;
 
     use super::*;
 
@@ -163,7 +181,10 @@ mod tests {
         let results = idx.query(&v, 1).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].block_id, 42);
-        assert!(results[0].similarity > 0.99, "similarity should be ~1 for the inserted vector");
+        assert!(
+            results[0].similarity > 0.99,
+            "similarity should be ~1 for the inserted vector"
+        );
     }
 
     #[test]

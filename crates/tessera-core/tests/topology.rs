@@ -3,20 +3,26 @@
 //! Verifies the new `Topology::node_of` / `is_same_node` / `World::peer_tier` helpers + the
 //! `MockTransport::with_topology` builder.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use tessera_core::block::BlockId;
 use tessera_core::rank::{LatencyTier, NodeId, RankId, Topology, World};
 use tessera_core::transport::{
     mock::{MockPeer, MockTransport},
-    BlockPayload, LatencyProfile, RankTransport, ReservationToken,
+    BlockPayload, LatencyProfile, ReservationToken,
 };
 
+// Used by the latency-injection setup paths below; suppress dead-code warnings while
+// the rest of this test module exercises topology assertions that don't go through it.
+#[allow(dead_code)]
 struct EchoPeer;
 impl MockPeer for EchoPeer {
     fn provide_block(&self, _: BlockId) -> anyhow::Result<BlockPayload> {
-        Ok(BlockPayload { c_kv: vec![], k_rope: vec![], fp8_scales: None })
+        Ok(BlockPayload {
+            c_kv: vec![],
+            k_rope: vec![],
+            fp8_scales: None,
+        })
     }
     fn accept_pushed(&self, _: BlockPayload) -> anyhow::Result<BlockId> {
         Ok(BlockId(0))
@@ -48,7 +54,11 @@ fn multi_node_topology_classifies_correctly() {
     };
     assert_eq!(topology.node_of(RankId(0)), Some(NodeId(0)));
     assert_eq!(topology.node_of(RankId(2)), Some(NodeId(1)));
-    assert_eq!(topology.node_of(RankId(99)), None, "out-of-range rank returns None");
+    assert_eq!(
+        topology.node_of(RankId(99)),
+        None,
+        "out-of-range rank returns None"
+    );
 
     assert!(topology.is_same_node(RankId(0), RankId(1)));
     assert!(!topology.is_same_node(RankId(0), RankId(2)));
@@ -99,7 +109,10 @@ async fn with_topology_builder_wraps_handles_with_latency_injector() {
         elapsed >= Duration::from_micros(200),
         "with_topology must inject cross-node latency; observed {elapsed:?}"
     );
-    assert!(result.is_err(), "unregistered peer: expect peer-lookup error");
+    assert!(
+        result.is_err(),
+        "unregistered peer: expect peer-lookup error"
+    );
 }
 
 // The DistributedSegmentIndex tier-budget scaling test lives in

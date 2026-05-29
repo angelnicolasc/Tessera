@@ -20,7 +20,10 @@ use tessera_core::{
 
 fn cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 32, rope_key_dim: 8 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 32,
+            rope_key_dim: 8,
+        },
         4,
         64,
         CkvDtype::Bf16,
@@ -76,7 +79,13 @@ impl MockPeer for CapacityPeer {
     }
 }
 
-fn make_pair(target_capacity_mb: u64) -> (Arc<TesseraBlockManager>, Arc<TesseraBlockManager>, MockTransport) {
+fn make_pair(
+    target_capacity_mb: u64,
+) -> (
+    Arc<TesseraBlockManager>,
+    Arc<TesseraBlockManager>,
+    MockTransport,
+) {
     let handles = MockTransport::new_world(2);
     let world0 = Arc::new(World::new(RankId(0), 2, Topology::SingleNode).unwrap());
     let world1 = Arc::new(World::new(RankId(1), 2, Topology::SingleNode).unwrap());
@@ -115,7 +124,11 @@ async fn full_success_consumes_reservation_and_releases_source() {
         .unwrap();
     assert_eq!(moved, 4);
     assert_eq!(src.used_blocks(), 0, "source must release after success");
-    assert_eq!(dst.used_blocks(), 4, "destination must hold imported blocks");
+    assert_eq!(
+        dst.used_blocks(),
+        4,
+        "destination must hold imported blocks"
+    );
     assert_eq!(peer.pushed.lock().len(), 4);
 }
 
@@ -135,12 +148,16 @@ async fn destination_oom_aborts_cleanly_without_touching_source() {
     assert!(src_used_before >= 50, "source should hold many blocks");
 
     let transport: Arc<dyn RankTransport> = Arc::new(handle.clone());
-    let result = src.transfer_request_to_rank(req_id, RankId(1), &transport).await;
+    let result = src
+        .transfer_request_to_rank(req_id, RankId(1), &transport)
+        .await;
     assert!(result.is_err(), "destination OOM must abort the transfer");
     if let Err(TesseraError::Backend(e)) = &result {
         let msg = format!("{e:?}");
         assert!(
-            msg.contains("out of MLA blocks") || msg.contains("OutOfBlocks") || msg.contains("reserve"),
+            msg.contains("out of MLA blocks")
+                || msg.contains("OutOfBlocks")
+                || msg.contains("reserve"),
             "error should reference reservation/OOM; got: {msg}"
         );
     }
@@ -150,7 +167,11 @@ async fn destination_oom_aborts_cleanly_without_touching_source() {
         src_used_before,
         "source must retain all blocks on aborted transfer"
     );
-    assert_eq!(peer.pushed.lock().len(), 0, "no blocks should have been pushed");
+    assert_eq!(
+        peer.pushed.lock().len(),
+        0,
+        "no blocks should have been pushed"
+    );
 }
 
 #[tokio::test]
@@ -183,7 +204,9 @@ async fn mid_stream_push_failure_releases_reservation_and_preserves_source() {
     }
     let src_used_before = src.used_blocks();
 
-    let result = src.transfer_request_to_rank(req_id, RankId(1), &transport).await;
+    let result = src
+        .transfer_request_to_rank(req_id, RankId(1), &transport)
+        .await;
     assert!(result.is_err(), "ALL_DROPS must cause transfer to fail");
     // Source still owns every block.
     assert_eq!(src.used_blocks(), src_used_before);
@@ -196,7 +219,10 @@ async fn mid_stream_push_failure_releases_reservation_and_preserves_source() {
     let active = tessera_core::metrics::RESERVATIONS_ACTIVE
         .with_label_values(&["r1"])
         .get();
-    assert_eq!(active, 0.0, "no reservations should leak on abort; observed {active}");
+    assert_eq!(
+        active, 0.0,
+        "no reservations should leak on abort; observed {active}"
+    );
 }
 
 #[tokio::test]
@@ -210,5 +236,8 @@ async fn empty_request_returns_zero_without_calling_transport() {
     assert_eq!(moved, 0);
     // No transport events for empty request.
     let events = handle.events();
-    assert!(events.is_empty(), "empty request should not touch transport");
+    assert!(
+        events.is_empty(),
+        "empty request should not touch transport"
+    );
 }

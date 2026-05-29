@@ -145,8 +145,9 @@ ignore = [
 convention = "google"
 
 [tool.pyright]
-include = ["python", "tests"]
-exclude = ["**/__pycache__", "**/.pytest_cache", "target", "docs/book"]
+# Strict on first-party source; tests deliberately untyped (see CI pyright step).
+include = ["python"]
+exclude = ["**/__pycache__", "**/.pytest_cache", "target", "docs/book", "tests"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "warning"

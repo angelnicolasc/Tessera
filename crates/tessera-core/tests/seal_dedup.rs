@@ -1,8 +1,6 @@
 //! Content-addressed deduplication: two blocks with identical `c_kv` bytes must collapse.
 
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 fn small_mla_cfg() -> MlaBlockConfig {
     // Use a tiny model footprint so the test runs in milliseconds even with the mock backend.

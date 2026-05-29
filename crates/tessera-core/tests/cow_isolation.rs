@@ -1,8 +1,6 @@
 //! Copy-on-write fork: mutations to the fork must not propagate to the original.
 
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 fn small_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(

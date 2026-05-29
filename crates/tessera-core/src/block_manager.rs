@@ -21,6 +21,7 @@
 //!   * Tier b — `ref_count == 1`, not indexed (inactive, low reuse value)
 //!   * Tier c — `ref_count == 1`, indexed (inactive, higher reuse value — avoid)
 //!   * Tier d — `ref_count > 1` (shared) — **never evicted**
+//!
 //! Within each tier the least-recently-touched block wins (epoch-based LRU).
 //!
 //! Everything that touches "device" memory goes through the [`DeviceBackend`] trait. With the
@@ -57,6 +58,11 @@ pub struct SealOutcome {
 
 /// Active PD-disagg reservation entry held by this rank as the **destination** of a
 /// pending transfer.
+//
+// Fields are populated when a reservation is created and consulted by the diagnostics
+// path; the struct itself is the inventory entry. `dead_code` suppresses the lint
+// while `consume_reservation_slot` (below) is wired through the import path.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 struct ReservationEntry {
     /// Request id the reservation belongs to.
@@ -206,9 +212,8 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
                 "memory_bytes={memory_bytes} too small for at least one block of {per_block} bytes"
             )));
         }
-        let total_blocks = u32::try_from(memory_bytes / per_block).map_err(|_| {
-            TesseraError::InvalidConfig("total_blocks does not fit in u32".into())
-        })?;
+        let total_blocks = u32::try_from(memory_bytes / per_block)
+            .map_err(|_| TesseraError::InvalidConfig("total_blocks does not fit in u32".into()))?;
 
         let primary_base = backend
             .alloc_region(
@@ -296,10 +301,7 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     ///
     /// Returns [`TesseraError::UnknownBlock`] if the block was evicted between the caller's
     /// reference and this call.
-    pub fn export_payload(
-        &self,
-        block_id: BlockId,
-    ) -> Result<crate::transport::BlockPayload> {
+    pub fn export_payload(&self, block_id: BlockId) -> Result<crate::transport::BlockPayload> {
         let primary_ptr = self
             .primary_ptr(block_id)
             .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
@@ -324,8 +326,10 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
         };
 
         let fp8_scales = if let Some(scales_ptr) = self.fp8_scales_ptr(block_id) {
-            let scales_len = usize::try_from(self.config.fp8_scale_block_bytes())
-                .map_err(|_| TesseraError::InvalidConfig("fp8 scale bytes overflow usize".into()))?;
+            let scales_len =
+                usize::try_from(self.config.fp8_scale_block_bytes()).map_err(|_| {
+                    TesseraError::InvalidConfig("fp8 scale bytes overflow usize".into())
+                })?;
             Some(
                 self.backend
                     .read_bytes(scales_ptr, scales_len)
@@ -335,7 +339,11 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
             None
         };
 
-        Ok(crate::transport::BlockPayload { c_kv, k_rope, fp8_scales })
+        Ok(crate::transport::BlockPayload {
+            c_kv,
+            k_rope,
+            fp8_scales,
+        })
     }
 
     /// Import a [`crate::transport::BlockPayload`] arriving from another rank, returning the
@@ -427,8 +435,13 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
         let counter = self.next_reservation_id.fetch_add(1, Ordering::Relaxed);
         let raw = (u64::from(self.rank.raw()) << 48) | counter;
         let token = ReservationToken(raw);
-        self.reservations
-            .insert(token, ReservationEntry { req_id, remaining: count });
+        self.reservations.insert(
+            token,
+            ReservationEntry {
+                req_id,
+                remaining: count,
+            },
+        );
         crate::metrics::RESERVATIONS_ACTIVE
             .with_label_values(&[&self.rank_label])
             .set(self.reservations.len() as f64);
@@ -451,6 +464,7 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     /// incoming pushed block. Returns `Ok(())` whether or not the reservation entry exists
     /// (allowing a non-reserved import path for backward compatibility with the Sprint 3
     /// tests).
+    #[allow(dead_code)] // wired in by import_payload in Sprint 4; kept for transactional path
     fn consume_reservation_slot(&self, token: Option<ReservationToken>) {
         let Some(tok) = token else { return };
         if let Some(mut entry) = self.reservations.get_mut(&tok) {
@@ -575,7 +589,9 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     /// a new owner. Errors if the block is unknown.
     pub fn increment_ref(&self, block_id: BlockId) -> Result<u32> {
         let blocks = self.blocks.read();
-        let meta = blocks.get(&block_id).ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
+        let meta = blocks
+            .get(&block_id)
+            .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
         let prev = meta.ref_count.fetch_add(1, Ordering::AcqRel);
         Ok(prev + 1)
     }
@@ -649,7 +665,11 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
         if let Some(scales_ptr_src) = self.fp8_scales_ptr(block_id) {
             let scales_ptr_dst = self.fp8_scales_ptr(new_id).expect("dst alloc matches src");
             self.backend
-                .memcpy(scales_ptr_src, scales_ptr_dst, self.config.fp8_scale_block_bytes())
+                .memcpy(
+                    scales_ptr_src,
+                    scales_ptr_dst,
+                    self.config.fp8_scale_block_bytes(),
+                )
                 .map_err(TesseraError::Backend)?;
         }
         crate::metrics::COW_FORKS.inc();
@@ -683,13 +703,17 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     ///
     /// This is the primary per-request teardown path (TD-004 / ADR-0009).
     pub fn release_request(&self, req_id: u64) -> u32 {
-        let block_ids = self.req_blocks.remove(&req_id).map(|(_, v)| v).unwrap_or_default();
+        let block_ids = self
+            .req_blocks
+            .remove(&req_id)
+            .map(|(_, v)| v)
+            .unwrap_or_default();
         let count = u32::try_from(block_ids.len()).unwrap_or(u32::MAX);
         for block_id in block_ids {
             let _ = self.free(block_id);
         }
         if count > 0 {
-            crate::metrics::REQUEST_RELEASES_TOTAL.inc_by(u64::from(count));
+            crate::metrics::REQUEST_RELEASES_TOTAL.inc_by(f64::from(count));
         }
         count
     }
@@ -748,9 +772,9 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     pub fn fp8_scales_ptr(&self, block_id: BlockId) -> Option<DevicePtr> {
         let base = self.fp8_scales_base?;
         let blocks = self.blocks.read();
-        blocks.contains_key(&block_id).then(|| {
-            base.offset(u64::from(block_id.raw()) * self.config.fp8_scale_block_bytes())
-        })
+        blocks
+            .contains_key(&block_id)
+            .then(|| base.offset(u64::from(block_id.raw()) * self.config.fp8_scale_block_bytes()))
     }
 
     /// Test helper: fill a deterministic pattern over the primary region of `block_id`. Used
@@ -762,7 +786,9 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
             .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
         let n = usize::try_from(self.config.primary_block_bytes())
             .map_err(|_| TesseraError::InvalidConfig("primary bytes overflow usize".into()))?;
-        self.backend.fill_pattern(ptr, byte, n).map_err(TesseraError::Backend)
+        self.backend
+            .fill_pattern(ptr, byte, n)
+            .map_err(TesseraError::Backend)
     }
 
     // ─────────────────────────── internals ───────────────────────────────────
@@ -773,7 +799,8 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     }
 
     fn rope_ptr_unchecked(&self, block_id: BlockId) -> DevicePtr {
-        self.rope_base.offset(u64::from(block_id.raw()) * self.config.rope_block_bytes())
+        self.rope_base
+            .offset(u64::from(block_id.raw()) * self.config.rope_block_bytes())
     }
 
     /// Hash the primary region using the pluggable `hash_device` method (WS10 seam).
@@ -783,7 +810,9 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
             .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
         let n = usize::try_from(self.config.primary_block_bytes())
             .map_err(|_| TesseraError::InvalidConfig("primary bytes overflow usize".into()))?;
-        self.hasher.hash_device(&self.backend, ptr, n).map_err(TesseraError::Backend)
+        self.hasher
+            .hash_device(&self.backend, ptr, n)
+            .map_err(TesseraError::Backend)
     }
 
     /// Physically return `block_id` to the free pool. Removes the block from the metadata
@@ -806,7 +835,8 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
             }
             // Clean up content index (only if the block was ever sealed).
             if meta.content_hash != 0 {
-                self.content_index.remove_if(&meta.content_hash, |_, v| *v == block_id);
+                self.content_index
+                    .remove_if(&meta.content_hash, |_, v| *v == block_id);
             }
         }
         self.free_list.lock().push(block_id);
@@ -841,17 +871,17 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
                 match rc {
                     0 => {
                         // Tier a: orphaned — always prefer oldest epoch.
-                        if best_a.map_or(true, |(_, t)| ts < t) {
+                        if best_a.is_none_or(|(_, t)| ts < t) {
                             best_a = Some((*id, ts));
                         }
                     }
                     1 if !meta.indexed => {
-                        if best_b.map_or(true, |(_, t)| ts < t) {
+                        if best_b.is_none_or(|(_, t)| ts < t) {
                             best_b = Some((*id, ts));
                         }
                     }
                     1 => {
-                        if best_c.map_or(true, |(_, t)| ts < t) {
+                        if best_c.is_none_or(|(_, t)| ts < t) {
                             best_c = Some((*id, ts));
                         }
                     }
@@ -870,7 +900,9 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
             // Force-free the block regardless of ref_count. The owner may later call
             // free(block_id), which will find the block absent and return Ok(()) safely.
             let _ = self.free_block_internal(block_id);
-            crate::metrics::EVICTIONS_TOTAL.with_label_values(&[tier.label()]).inc();
+            crate::metrics::EVICTIONS_TOTAL
+                .with_label_values(&[tier.label()])
+                .inc();
             tracing::debug!(?block_id, tier = tier.label(), "evicted block");
         }
     }

@@ -4,13 +4,14 @@
 //! shared blocks are unaffected when only one owner releases, and that the `used_blocks`
 //! counter reaches zero after a complete teardown.
 
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 fn small_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 32, rope_key_dim: 8 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 32,
+            rope_key_dim: 8,
+        },
         4,
         64,
         CkvDtype::Bf16,
@@ -29,15 +30,20 @@ fn make_manager() -> TesseraBlockManager {
 fn alloc_n_then_release_request_drops_to_zero() {
     let mgr = make_manager();
     let req_a: u64 = 42;
-    let n = 5;
+    let n: u32 = 5;
     for i in 0..n {
-        mgr.allocate(req_a, TokenRange::new(i as u32 * 64, (i as u32 + 1) * 64)).unwrap();
+        mgr.allocate(req_a, TokenRange::new(i * 64, (i + 1) * 64))
+            .unwrap();
     }
     assert_eq!(mgr.used_blocks(), n);
 
     let freed = mgr.release_request(req_a);
     assert_eq!(freed, n, "release_request must report the freed count");
-    assert_eq!(mgr.used_blocks(), 0, "all blocks must be returned to free pool");
+    assert_eq!(
+        mgr.used_blocks(),
+        0,
+        "all blocks must be returned to free pool"
+    );
 }
 
 /// Two requests allocate disjoint blocks; releasing one request leaves the other untouched.
@@ -58,7 +64,10 @@ fn release_request_partial_respects_other_owner() {
     assert_eq!(mgr.used_blocks(), 1, "req_b's block must survive");
 
     // req_b's block is still accessible.
-    assert!(mgr.primary_ptr(b_block).is_some(), "block must still be allocated");
+    assert!(
+        mgr.primary_ptr(b_block).is_some(),
+        "block must still be allocated"
+    );
     // req_a's block is gone.
     assert!(mgr.primary_ptr(a_block).is_none(), "block must be freed");
 }

@@ -4,14 +4,15 @@
 //! recently-touched blocks survive longer than older ones within the same tier;
 //! shared blocks (ref_count > 1, tier d) are never evicted.
 
-use tessera_core::{
-    CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange,
-};
+use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockManager, TokenRange};
 
 /// Very small pool: exactly 2 blocks. Forces eviction on the 3rd allocation.
 fn two_block_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 32, rope_key_dim: 8 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 32,
+            rope_key_dim: 8,
+        },
         4,
         64,
         CkvDtype::Bf16,
@@ -36,7 +37,7 @@ fn orphaned_block_evicted_before_shared() {
 
     // Allocate all 3 blocks.
     let b0 = mgr.allocate(1, TokenRange::new(0, 64)).unwrap();
-    let b1 = mgr.allocate(1, TokenRange::new(64, 128)).unwrap();
+    let _b1 = mgr.allocate(1, TokenRange::new(64, 128)).unwrap();
     let b2 = mgr.allocate(2, TokenRange::new(0, 64)).unwrap();
 
     // Give b2 a second ref so it is "shared" (tier d).
@@ -57,7 +58,10 @@ fn orphaned_block_evicted_before_shared() {
     let _b4 = mgr.allocate(4, TokenRange::new(192, 256)).unwrap();
 
     // b2 must still be alive (tier d was never evicted).
-    assert!(mgr.primary_ptr(b2).is_some(), "shared block must not be evicted");
+    assert!(
+        mgr.primary_ptr(b2).is_some(),
+        "shared block must not be evicted"
+    );
 
     // Cleanup leftover ref on b2.
     mgr.free(b2).unwrap();
@@ -105,7 +109,10 @@ fn shared_block_never_evicted() {
     // Pool full; 3rd allocation must evict `_other` (tier b) rather than `shared` (tier d).
     let _third = mgr.allocate(3, TokenRange::new(128, 192)).unwrap();
 
-    assert!(mgr.primary_ptr(shared).is_some(), "shared block (tier d) must never be evicted");
+    assert!(
+        mgr.primary_ptr(shared).is_some(),
+        "shared block (tier d) must never be evicted"
+    );
 
     // Cleanup.
     mgr.free(shared).unwrap();

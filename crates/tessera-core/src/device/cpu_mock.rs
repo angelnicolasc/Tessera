@@ -55,10 +55,7 @@ impl DeviceBackend for CpuMockBackend {
         let mut inner = self.inner.lock();
         tracing::debug!(?kind, size, raw, "cpu_mock alloc_region");
         inner.regions.push(region);
-        Ok(DevicePtr {
-            raw,
-            len: bytes,
-        })
+        Ok(DevicePtr { raw, len: bytes })
     }
 
     fn memcpy(&self, src: DevicePtr, dst: DevicePtr, bytes: u64) -> anyhow::Result<()> {
@@ -127,7 +124,10 @@ impl DeviceBackend for CpuMockBackend {
         let (i, off) =
             Self::locate(&inner, ptr).context("cpu_mock write_bytes: ptr not in any region")?;
         if off + bytes.len() > inner.regions[i].len() {
-            bail!("cpu_mock write_bytes: out-of-range write {} bytes", bytes.len());
+            bail!(
+                "cpu_mock write_bytes: out-of-range write {} bytes",
+                bytes.len()
+            );
         }
         inner.regions[i][off..off + bytes.len()].copy_from_slice(bytes);
         Ok(())

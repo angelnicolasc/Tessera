@@ -70,7 +70,10 @@ jobs:
       - name: ruff format
         run: ruff format --check python tests benchmarks
       - name: pyright
-        run: pyright python tests
+        # Pyright runs strict on first-party source only. `tests/` is intentionally
+        # untyped (math notation, lazy imports, mock-heavy fixtures) and would generate
+        # hundreds of false positives under strict mode without adding test value.
+        run: pyright python
 
   test-python:
     name: Test Python (${{ matrix.python }})

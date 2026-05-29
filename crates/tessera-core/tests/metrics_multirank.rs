@@ -19,7 +19,11 @@ use tessera_core::{
 struct StaticPeer;
 impl MockPeer for StaticPeer {
     fn provide_block(&self, _: BlockId) -> anyhow::Result<BlockPayload> {
-        Ok(BlockPayload { c_kv: vec![1, 2, 3], k_rope: vec![4], fp8_scales: None })
+        Ok(BlockPayload {
+            c_kv: vec![1, 2, 3],
+            k_rope: vec![4],
+            fp8_scales: None,
+        })
     }
     fn accept_pushed(&self, _: BlockPayload) -> anyhow::Result<BlockId> {
         Ok(BlockId(0))
@@ -42,7 +46,10 @@ async fn cross_rank_transfer_metric_is_recorded_on_fetch() {
     let after = metrics::CROSS_RANK_TRANSFERS_TOTAL
         .with_label_values(&["r1", "r0", "fetch"])
         .get();
-    assert!(after > before, "fetch should increment the cross-rank transfer counter");
+    assert!(
+        after > before,
+        "fetch should increment the cross-rank transfer counter"
+    );
 }
 
 #[tokio::test]
@@ -75,9 +82,7 @@ async fn broadcast_seal_increments_per_peer() {
 #[test]
 fn metric_families_appear_in_snapshot_text() {
     // Touch each new family at least once so it materialises in the text encoder output.
-    metrics::BLOCKS_PER_RANK
-        .with_label_values(&["r0"])
-        .set(1.0);
+    metrics::BLOCKS_PER_RANK.with_label_values(&["r0"]).set(1.0);
     metrics::PD_DISAGG_TRANSFERS_TOTAL
         .with_label_values(&["r0", "r1"])
         .inc();

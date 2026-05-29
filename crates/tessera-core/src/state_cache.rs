@@ -72,8 +72,7 @@ impl StateCacheConfig {
         // Per token: BF16(rope_dim) + FP8(head_dim - rope_dim) = bf16*2 + fp8*1 bytes.
         let bytes_per_token =
             u64::from(rope_dim) * 2 + u64::from(head_dim.saturating_sub(rope_dim));
-        let swa_bytes_per_request =
-            bytes_per_token * u64::from(num_layers) * u64::from(win);
+        let swa_bytes_per_request = bytes_per_token * u64::from(num_layers) * u64::from(win);
         let tail_bytes_per_request =
             bytes_per_token * u64::from(num_layers) * u64::from(max_uncompressed_tail);
         Self {
@@ -159,7 +158,11 @@ impl<B: DeviceBackend> StateCache<B> {
         let tail_ptr = self
             .tail_base
             .offset(u64::from(slot) * self.config.tail_bytes_per_request);
-        let entry = StateEntry { swa_ptr, tail_ptr, slot };
+        let entry = StateEntry {
+            swa_ptr,
+            tail_ptr,
+            slot,
+        };
         self.active.insert(req_id, entry);
         self.used.fetch_add(1, Ordering::Relaxed);
         Ok((swa_ptr, tail_ptr))
@@ -240,12 +243,8 @@ mod tests {
 
     fn cfg() -> StateCacheConfig {
         StateCacheConfig::for_v4(
-            /* head_dim */ 512,
-            /* rope_dim */ 64,
-            /* num_layers */ 4,
-            /* win */ 128,
-            /* max_uncompressed_tail */ 127,
-            /* max_requests */ 8,
+            /* head_dim */ 512, /* rope_dim */ 64, /* num_layers */ 4,
+            /* win */ 128, /* max_uncompressed_tail */ 127, /* max_requests */ 8,
         )
     }
 

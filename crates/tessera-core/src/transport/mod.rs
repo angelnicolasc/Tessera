@@ -74,9 +74,7 @@ pub struct BlockPayload {
 impl BlockPayload {
     /// Approximate heap footprint of this payload — useful for metric histograms.
     pub fn byte_len(&self) -> usize {
-        self.c_kv.len()
-            + self.k_rope.len()
-            + self.fp8_scales.as_ref().map_or(0, Vec::len)
+        self.c_kv.len() + self.k_rope.len() + self.fp8_scales.as_ref().map_or(0, Vec::len)
     }
 }
 
@@ -98,36 +96,20 @@ pub trait RankTransport: Send + Sync {
 
     /// Fetch the full payload of `block_id` from rank `src`. Used for cross-rank
     /// content-addressed sharing and for the PD-disaggregation reverse-pull path.
-    async fn fetch_block(
-        &self,
-        src: RankId,
-        block_id: BlockId,
-    ) -> anyhow::Result<BlockPayload>;
+    async fn fetch_block(&self, src: RankId, block_id: BlockId) -> anyhow::Result<BlockPayload>;
 
     /// Push a payload to rank `dst`, returning the local block id assigned by the
     /// destination's block manager. Used by the PD-disaggregation push-mode path. The
     /// destination is responsible for allocating the block and writing the bytes.
-    async fn push_block(
-        &self,
-        dst: RankId,
-        payload: BlockPayload,
-    ) -> anyhow::Result<BlockId>;
+    async fn push_block(&self, dst: RankId, payload: BlockPayload) -> anyhow::Result<BlockId>;
 
     /// Announce release of `block_id` so peers can drop any cached references.
-    async fn announce_release(
-        &self,
-        src: RankId,
-        block_id: BlockId,
-    ) -> anyhow::Result<()>;
+    async fn announce_release(&self, src: RankId, block_id: BlockId) -> anyhow::Result<()>;
 
     /// Look up whether peer `dst` is holding a block whose content hash matches the given
     /// value. Used by [`crate::block_manager::TesseraBlockManager`]'s distributed lookup
     /// fast-path before a full descriptor fan-out. Returns `Ok(None)` for "no match".
-    async fn query_hash(
-        &self,
-        dst: RankId,
-        content_hash: u64,
-    ) -> anyhow::Result<Option<BlockId>>;
+    async fn query_hash(&self, dst: RankId, content_hash: u64) -> anyhow::Result<Option<BlockId>>;
 
     /// Reserve `count` block slots on peer `dst` for `req_id`. Used by the reserve-then-stream
     /// PD-disaggregation protocol (ADR-0018): the source rank calls this before its first
@@ -147,11 +129,8 @@ pub trait RankTransport: Send + Sync {
     /// rollback path when a `transfer_request_to_rank` aborts mid-stream. Safe to call
     /// even when partial pushes have already consumed some of the reserved slots — the
     /// implementation releases only the unused remainder.
-    async fn release_reservation(
-        &self,
-        dst: RankId,
-        token: ReservationToken,
-    ) -> anyhow::Result<()>;
+    async fn release_reservation(&self, dst: RankId, token: ReservationToken)
+        -> anyhow::Result<()>;
 
     /// Describes the world this transport spans. Used by selection logic and metrics.
     fn topology(&self) -> &Topology;

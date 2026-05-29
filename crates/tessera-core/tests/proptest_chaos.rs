@@ -20,7 +20,10 @@ use tessera_core::{
 
 fn small_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 16, rope_key_dim: 4 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 16,
+            rope_key_dim: 4,
+        },
         2,
         64,
         CkvDtype::Bf16,
@@ -159,7 +162,9 @@ impl StaticPeer {
 }
 impl MockPeer for StaticPeer {
     fn provide_block(&self, b: BlockId) -> anyhow::Result<BlockPayload> {
-        self.manager.export_payload(b).map_err(|e| anyhow::anyhow!("{e}"))
+        self.manager
+            .export_payload(b)
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
     fn accept_pushed(&self, p: BlockPayload) -> anyhow::Result<BlockId> {
         self.manager
@@ -228,7 +233,9 @@ fn transfer_atomicity_under_chaos() {
             );
             let transport: Arc<dyn RankTransport> = Arc::new(injector);
 
-            let outcome = src.transfer_request_to_rank(seed, RankId(1), &transport).await;
+            let outcome = src
+                .transfer_request_to_rank(seed, RankId(1), &transport)
+                .await;
             let src_after = src.used_blocks();
             let dst_after = dst.used_blocks();
 

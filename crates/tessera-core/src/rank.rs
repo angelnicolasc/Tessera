@@ -10,9 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// Stable per-process rank identifier within a world. Wrapping `u32` in a newtype keeps the
 /// rank namespace distinct from block ids and request ids.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct RankId(pub u32);
 
@@ -70,9 +68,7 @@ impl LatencyTier {
 
 /// Stable per-node identifier. Reserved for [`Topology::MultiNode`] in Sprint 4; the type
 /// exists today so the public API of [`World`] does not change when multi-node lands.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct NodeId(pub u32);
 
@@ -161,7 +157,11 @@ impl World {
                 return None;
             }
         }
-        Some(Self { local, size, topology })
+        Some(Self {
+            local,
+            size,
+            topology,
+        })
     }
 
     /// Canonical single-rank world. Used by [`crate::block_manager::TesseraBlockManager::new`]
