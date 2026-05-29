@@ -12,10 +12,7 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import pytest
-
 from tessera import _native
-
 
 # ──────────── helpers ─────────────────────────────────────────────────────────
 

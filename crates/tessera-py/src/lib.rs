@@ -677,7 +677,11 @@ impl PyWorld {
             "World(local=r{}, size={}, topology={})",
             self.inner.local.raw(),
             self.inner.size,
-            if self.inner.topology.is_multi_node() { "MultiNode" } else { "SingleNode" }
+            if self.inner.topology.is_multi_node() {
+                "MultiNode"
+            } else {
+                "SingleNode"
+            }
         )
     }
 }
@@ -761,7 +765,10 @@ impl PyMockTransport {
             .into_iter()
             .map(|m| {
                 let arc: Arc<dyn RankTransport> = Arc::new(m.clone());
-                Self { inner: arc, mock: m }
+                Self {
+                    inner: arc,
+                    mock: m,
+                }
             })
             .collect()
     }
@@ -771,7 +778,10 @@ impl PyMockTransport {
     fn singleton() -> Self {
         let m = MockTransport::singleton();
         let arc: Arc<dyn RankTransport> = Arc::new(m.clone());
-        Self { inner: arc, mock: m }
+        Self {
+            inner: arc,
+            mock: m,
+        }
     }
 
     /// Wire a `BlockManager` as the peer answering for `rank` on this transport handle. The
@@ -779,12 +789,7 @@ impl PyMockTransport {
     /// via `push_block`. The destination's token range is currently fixed at `[0, 64)` for
     /// Sprint 3; this matches FlashMLA's block size and is sufficient for the multirank
     /// tests.
-    fn register_block_manager_peer(
-        &self,
-        rank: u32,
-        manager: &PyBlockManager,
-        accept_req_id: u64,
-    ) {
+    fn register_block_manager_peer(&self, rank: u32, manager: &PyBlockManager, accept_req_id: u64) {
         let adapter = BlockManagerPeerAdapter {
             manager: Arc::clone(&manager.inner),
             accept_req_id,
@@ -907,6 +912,9 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistributedSegmentIndex>()?;
     m.add_function(wrap_pyfunction!(metrics_snapshot_text, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("REQUIRED_BLOCK_SIZE_TOKENS", tessera_core::config::REQUIRED_BLOCK_SIZE_TOKENS)?;
+    m.add(
+        "REQUIRED_BLOCK_SIZE_TOKENS",
+        tessera_core::config::REQUIRED_BLOCK_SIZE_TOKENS,
+    )?;
     Ok(())
 }

@@ -85,7 +85,7 @@ def spawn_multirank_world(
         msg = f"world_size must be >= 1; got {world_size}"
         raise ValueError(msg)
 
-    from tessera import _native  # noqa: PLC0415 — lazy import keeps the module test-friendly
+    from tessera import _native
 
     if world_size == 1:
         world = _native.World.singleton()

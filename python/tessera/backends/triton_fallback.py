@@ -49,9 +49,10 @@ class TritonMLABackend(MlaAttentionBackend):
         last_exc: Exception | None = None
         for module_path, fn_name in _VLLM_TRITON_MLA_CANDIDATES:
             try:
-                import importlib  # noqa: PLC0415
+                import importlib
+
                 mod = importlib.import_module(module_path)
-                fn  = getattr(mod, fn_name, None)
+                fn = getattr(mod, fn_name, None)
                 if fn is not None:
                     return fn
             except ImportError as exc:

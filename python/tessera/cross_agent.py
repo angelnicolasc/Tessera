@@ -1,5 +1,6 @@
 """Thin Python wrapper around the native ``ShareTable``. Provided so call sites import a
-stable ``tessera.cross_agent`` API instead of reaching into ``tessera._native``."""
+stable ``tessera.cross_agent`` API instead of reaching into ``tessera._native``.
+"""
 
 from __future__ import annotations
 
@@ -23,7 +24,8 @@ class CrossAgentShareTable:
 
     def release_request(self, req_id: int) -> list[int]:
         """Release every shared block held by ``req_id``. The returned ids must be freed on
-        the block manager."""
+        the block manager.
+        """
         return self._inner.release_request(req_id)
 
     def owners(self, block_id: int) -> list[int] | None:

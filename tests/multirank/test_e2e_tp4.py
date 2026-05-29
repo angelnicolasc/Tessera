@@ -85,7 +85,7 @@ def test_distributed_segment_index_remote_hit(
     via DistributedSegmentIndex. We don't wire BlockManagerPeerAdapter.lookup_hash to return
     real hits (it returns None in the adapter), so this test verifies the safe-miss path:
     no remote hit yields None gracefully."""
-    from tessera import _native  # noqa: PLC0415
+    from tessera import _native
 
     world = _native.World.single_node(local=0, size=2)
     idx = _native.DistributedSegmentIndex(

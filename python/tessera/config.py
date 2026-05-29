@@ -15,7 +15,6 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 REQUIRED_BLOCK_SIZE_TOKENS = 64
 
 
@@ -60,8 +59,12 @@ class V4Config(BaseModel):
     k2: Annotated[int, Field(gt=0, description="HCA token compression ratio (paper: 128)")]
     head_dim: Annotated[int, Field(gt=0, description="per-head dim (paper: 512)")]
     rope_dim: Annotated[int, Field(gt=0, description="trailing RoPE BF16 dims (paper: 64)")]
-    indexer_head_dim: Annotated[int, Field(gt=0, description="Lightning Indexer head dim (paper: 128)")]
-    num_indexer_heads: Annotated[int, Field(gt=0, description="Lightning Indexer query heads (paper: 64)")]
+    indexer_head_dim: Annotated[
+        int, Field(gt=0, description="Lightning Indexer head dim (paper: 128)")
+    ]
+    num_indexer_heads: Annotated[
+        int, Field(gt=0, description="Lightning Indexer query heads (paper: 64)")
+    ]
     top_k: Annotated[int, Field(gt=0, description="sparse top-k (paper: 512 Flash / 1024 Pro)")]
     swa_window: Annotated[int, Field(gt=0, description="SWA window (paper: 128)")]
     """Layer pattern, length must equal num_layers. Each entry is one of
@@ -256,7 +259,9 @@ class TesseraConfig(BaseModel):
             fp8_scales = m.num_layers * 4 if b.ckv_dtype == "fp8_e4m3" else 0
             total = 64 + ckv_bytes + rope_bytes + fp8_scales
         else:
-            kv_bytes = 2 * m.num_heads * m.head_dim * b.block_size_tokens * m.num_layers * dtype_bytes
+            kv_bytes = (
+                2 * m.num_heads * m.head_dim * b.block_size_tokens * m.num_layers * dtype_bytes
+            )
             total = 64 + kv_bytes
         mha_bf16 = 2 * m.num_heads * m.head_dim * b.block_size_tokens * m.num_layers * 2
         return mha_bf16 / total

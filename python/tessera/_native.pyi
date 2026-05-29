@@ -6,8 +6,6 @@ stub gives Pyright exact signatures without needing the extension built during t
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -27,9 +25,7 @@ class CompressionScheme:
     @staticmethod
     def mha_full(num_heads: int, head_dim: int) -> CompressionScheme: ...
     @staticmethod
-    def dsa_hierarchical(
-        coarse_dim: int, fine_dim: int, swa_window: int
-    ) -> CompressionScheme:
+    def dsa_hierarchical(coarse_dim: int, fine_dim: int, swa_window: int) -> CompressionScheme:
         """Deprecated (Sprint 5). Use v4_csa/v4_hca/v4_swa. See ADR-0020."""
     @staticmethod
     def v4_csa(
@@ -137,9 +133,7 @@ class UsearchIndex:
         expansion_search: int = 64,
     ) -> None: ...
     def add(self, block_id: int, descriptor: NDArray[np.float32]) -> None: ...
-    def query(
-        self, descriptor: NDArray[np.float32], k: int
-    ) -> list[tuple[int, float]]: ...
+    def query(self, descriptor: NDArray[np.float32], k: int) -> list[tuple[int, float]]: ...
     def remove(self, block_id: int) -> None: ...
     def __len__(self) -> int: ...
     def name(self) -> str: ...

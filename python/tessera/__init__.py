@@ -23,11 +23,12 @@ from tessera.kernel_dispatch import KernelBackend, get_mla_backend
 from tessera.segment_index import SegmentIndex, SegmentMatch
 
 if TYPE_CHECKING:
-    from tessera import _native as _native_module
+    from tessera import _native as _native_module  # noqa: F401  (re-exported for type checkers)
     from tessera.vllm_plugin import TesseraBlockAllocator
 
 
 __all__ = [
+    "REQUIRED_BLOCK_SIZE_TOKENS",
     "BlockManager",
     "CkvDtype",
     "CompressionScheme",
@@ -36,7 +37,6 @@ __all__ = [
     "MlaBlockConfig",
     "MockTransport",
     "MultiRankCoordinator",
-    "REQUIRED_BLOCK_SIZE_TOKENS",
     "RankId",
     "SegmentIndex",
     "SegmentMatch",

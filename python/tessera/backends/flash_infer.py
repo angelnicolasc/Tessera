@@ -42,7 +42,7 @@ class FlashInferMLABackend(MlaAttentionBackend):
         if self._wrapper_cls is not None:
             return self._wrapper_cls
         try:
-            import flashinfer  # type: ignore[import-not-found]  # noqa: PLC0415
+            import flashinfer  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - environment-dependent
             msg = "flashinfer is not installed. `pip install flashinfer>=0.2`"
             raise RuntimeError(msg) from exc
@@ -92,7 +92,7 @@ class FlashInferMLABackend(MlaAttentionBackend):
         cfg = self._config
         scale = cfg.kernel.softmax_scale
         if scale is None:
-            scale = 1.0 / (cfg.model.latent_dim ** 0.5)
+            scale = 1.0 / (cfg.model.latent_dim**0.5)
 
         wrapper.plan(
             qo_indptr=seqlens,

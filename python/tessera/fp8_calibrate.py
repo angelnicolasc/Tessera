@@ -42,9 +42,7 @@ def compute_per_layer_scales(
         ``{layer_idx: scale_factor}`` where the scale is ``max(samples) / fp8_max`` per layer.
     """
     return {
-        layer_idx: max(samples) / fp8_max
-        for layer_idx, samples in layer_maxabs.items()
-        if samples
+        layer_idx: max(samples) / fp8_max for layer_idx, samples in layer_maxabs.items() if samples
     }
 
 
@@ -143,7 +141,7 @@ def calibrate_ckv_fp8_scales(
         ``{layer_idx: scale_factor}``.
     """
     try:
-        import torch  # noqa: PLC0415
+        import torch
     except ImportError as exc:  # pragma: no cover - environment-dependent
         msg = "torch is required for FP8 calibration. `pip install tessera[torch]`"
         raise RuntimeError(msg) from exc

@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "python"))
 
-from tessera.config import TesseraConfig  # noqa: E402
+from tessera.config import TesseraConfig
 
 
 def report(config: TesseraConfig) -> None:

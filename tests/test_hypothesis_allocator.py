@@ -21,10 +21,10 @@ import pytest
 pytest.importorskip("hypothesis")
 pytest.importorskip("tessera._native")
 
-from hypothesis import HealthCheck, given, settings  # noqa: E402
-from hypothesis import strategies as st  # noqa: E402
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
-from tessera import _native  # noqa: E402
+from tessera import _native
 
 
 def small_cfg():

@@ -21,10 +21,10 @@ torch = pytest.importorskip("torch", reason="torch required")
 
 from tessera.reference.absorbed_attention import reference_absorbed_mla
 
-DS_V3_D_C   = 512
-DS_V3_D_R   = 64
-DS_V3_D_H   = 128
-DS_V3_H     = 128
+DS_V3_D_C = 512
+DS_V3_D_R = 64
+DS_V3_D_H = 128
+DS_V3_H = 128
 DS_V3_SCALE = 1.0 / math.sqrt(DS_V3_D_C)
 
 
@@ -36,16 +36,22 @@ def _make_needle_inputs(seq_len: int, device: torch.device) -> dict:
     c_kv = torch.zeros(1, seq_len, DS_V3_D_C, dtype=torch.bfloat16, device=device)
     c_kv[:, needle_pos, :] = 10.0  # strong needle signal
 
-    q_abs  = torch.ones(1, 1, DS_V3_D_C, dtype=torch.bfloat16, device=device)  # aligns
+    q_abs = torch.ones(1, 1, DS_V3_D_C, dtype=torch.bfloat16, device=device)  # aligns
     q_rope = torch.zeros(1, 1, DS_V3_D_R, dtype=torch.bfloat16, device=device)
     k_rope = torch.zeros(1, seq_len, DS_V3_D_R, dtype=torch.bfloat16, device=device)
-    W_UV   = (
+    W_UV = (
         torch.eye(DS_V3_D_H, DS_V3_D_C, dtype=torch.bfloat16, device=device)
         .unsqueeze(0)
         .expand(1, -1, -1)
     )
-    return dict(q_abs=q_abs, q_rope=q_rope, c_kv=c_kv, k_rope=k_rope, W_UV=W_UV,
-                scale=DS_V3_SCALE)
+    return {
+        "q_abs": q_abs,
+        "q_rope": q_rope,
+        "c_kv": c_kv,
+        "k_rope": k_rope,
+        "W_UV": W_UV,
+        "scale": DS_V3_SCALE,
+    }
 
 
 @pytest.mark.gpu
@@ -57,7 +63,7 @@ def test_needle_in_haystack_precision(gpu, seq_len: int):
     or the attention mechanism — investigate accumulation before enabling FP8 production.
     """
     inp = _make_needle_inputs(seq_len, gpu)
-    out = reference_absorbed_mla(**inp)   # [1, 1, d_h]
+    out = reference_absorbed_mla(**inp)  # [1, 1, d_h]
 
     mean_abs = out.abs().mean().item()
     assert mean_abs > 5.0, (
@@ -75,18 +81,18 @@ def test_needle_attention_weight_dominates(gpu, seq_len: int):
     needle_pos = seq_len // 2
 
     c_kv = torch.zeros(1, seq_len, DS_V3_D_C, dtype=torch.bfloat16, device=gpu)
-    c_kv[:, needle_pos, :] = 20.0   # even stronger signal
+    c_kv[:, needle_pos, :] = 20.0  # even stronger signal
 
-    q_abs  = torch.ones(1, 1, DS_V3_D_C, dtype=torch.bfloat16, device=gpu)
-    q_rope = torch.zeros(1, 1, DS_V3_D_R, dtype=torch.bfloat16, device=gpu)
-    k_rope = torch.zeros(1, seq_len, DS_V3_D_R, dtype=torch.bfloat16, device=gpu)
+    q_abs = torch.ones(1, 1, DS_V3_D_C, dtype=torch.bfloat16, device=gpu)
+    torch.zeros(1, 1, DS_V3_D_R, dtype=torch.bfloat16, device=gpu)
+    torch.zeros(1, seq_len, DS_V3_D_R, dtype=torch.bfloat16, device=gpu)
 
     # Compute raw scores to inspect attention distribution.
     qA = q_abs.float()
-    C  = c_kv.float()
+    C = c_kv.float()
     scale = DS_V3_SCALE
     scores = torch.einsum("bhc,bsc->bhs", qA, C) * scale  # [1, 1, seq_len]
-    attn   = torch.softmax(scores, dim=-1)
+    attn = torch.softmax(scores, dim=-1)
 
     needle_weight = attn[0, 0, needle_pos].item()
     assert needle_weight > 0.9, (

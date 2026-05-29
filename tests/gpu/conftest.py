@@ -17,7 +17,8 @@ import pytest
 
 def _cuda_available() -> bool:
     try:
-        import torch  # noqa: PLC0415
+        import torch
+
         return torch.cuda.is_available()
     except ImportError:
         return False
@@ -35,16 +36,15 @@ def gpu():
     """
     if not _cuda_available():
         pytest.skip("CUDA device required for GPU tests; skipping on CPU-only machine")
-    import torch  # noqa: PLC0415
+    import torch
 
-    device = torch.device("cuda:0")
-    return device
+    return torch.device("cuda:0")
 
 
 @pytest.fixture(scope="session")
 def ds_v3_scale() -> float:
     """Softmax scale for DeepSeek-V3 config (1 / sqrt(d_c=512))."""
-    import math  # noqa: PLC0415
+    import math
 
     return 1.0 / math.sqrt(512)
 
@@ -62,7 +62,7 @@ def ds_v3_config(repo_root: Path):
     Available on both CPU and GPU — the config itself does not require a device. Tests that
     need a GPU should depend on both ``gpu`` and ``ds_v3_config``.
     """
-    from tessera.config import TesseraConfig  # noqa: PLC0415
+    from tessera.config import TesseraConfig
 
     toml_path = repo_root / "models" / "deepseek_v3.toml"
     return TesseraConfig.from_toml(toml_path)
@@ -75,7 +75,7 @@ def ds_v3_manager(ds_v3_config, gpu):  # type: ignore[no-untyped-def]
     Depends on ``gpu`` so it auto-skips on CPU-only machines. The manager uses the
     GPU memory budget from ``ds_v3_config.runtime.gpu_memory_bytes``.
     """
-    from tessera import _native  # noqa: PLC0415
+    from tessera import _native
 
     native_cfg = ds_v3_config.to_native_config()
     return _native.BlockManager(native_cfg, ds_v3_config.runtime.gpu_memory_bytes)

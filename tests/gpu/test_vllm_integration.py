@@ -29,7 +29,6 @@ def _fill_blocks_with_pattern(
     pattern: int = 0xAA,
 ) -> list[int]:
     """Allocate n_blocks, fill with pattern, seal, and return canonical block IDs."""
-    import numpy as np  # noqa: PLC0415
 
     block_size = allocator._config.block.block_size_tokens
     latent_dim = allocator._config.model.latent_dim
@@ -55,7 +54,7 @@ def test_vllm_allocator_dedup_rate(gpu, ds_v3_config) -> None:  # type: ignore[n
     Each request gets 8 prefix blocks filled with the same pattern → all 8 should dedup
     to the same canonical block → ``sharing_rate > 0`` and ``used_blocks < 8 * 8``.
     """
-    from tessera.vllm_plugin import TesseraBlockAllocator  # noqa: PLC0415
+    from tessera.vllm_plugin import TesseraBlockAllocator
 
     allocator = TesseraBlockAllocator(ds_v3_config)
 
@@ -97,9 +96,9 @@ def test_tessera_alloc_throughput_vs_shim(gpu, ds_v3_config) -> None:  # type: i
     The shim baseline is intentionally simple (dict insert/delete) — not vLLM's real
     allocator. Real production comparison is in ``benchmarks/vllm_compare.py``.
     """
-    import time  # noqa: PLC0415
+    import time
 
-    from tessera.vllm_plugin import TesseraBlockAllocator  # noqa: PLC0415
+    from tessera.vllm_plugin import TesseraBlockAllocator
 
     allocator = TesseraBlockAllocator(ds_v3_config)
     block_size = ds_v3_config.block.block_size_tokens

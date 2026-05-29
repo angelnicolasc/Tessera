@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "python"))
 
-from tessera import _native  # noqa: E402
+from tessera import _native
 
 
 def _blocks_for_tokens(n_tokens: int, block_size: int = 64) -> int:
@@ -48,8 +48,8 @@ def run(
     block_bytes_mb = config.total_block_bytes() / (1024 * 1024)
     manager = _native.BlockManager(config, total_blocks_budget * config.total_block_bytes())
 
-    total_seals    = 0
-    dedup_hits     = 0
+    total_seals = 0
+    dedup_hits = 0
     canonical_set: set[int] = set()
 
     for agent_idx in range(n_agents):
@@ -81,23 +81,23 @@ def run(
             else:
                 canonical_set.add(canon)
 
-    unique_blocks     = len(canonical_set)
-    sharing_rate      = dedup_hits / total_seals if total_seals > 0 else 0.0
-    kv_mb_tessera     = unique_blocks * block_bytes_mb
-    kv_mb_naive       = total_seals * block_bytes_mb
+    unique_blocks = len(canonical_set)
+    sharing_rate = dedup_hits / total_seals if total_seals > 0 else 0.0
+    kv_mb_tessera = unique_blocks * block_bytes_mb
+    kv_mb_naive = total_seals * block_bytes_mb
 
     return {
-        "n_agents":             float(n_agents),
-        "doc_blocks":           float(doc_blocks),
+        "n_agents": float(n_agents),
+        "doc_blocks": float(doc_blocks),
         "sys_blocks_per_agent": float(sys_blocks_per_agent),
-        "total_seals":          float(total_seals),
-        "dedup_hits":           float(dedup_hits),
-        "sharing_rate":         sharing_rate,
-        "unique_blocks":        float(unique_blocks),
-        "expected_unique":      float(doc_blocks + n_agents * sys_blocks_per_agent),
-        "kv_cache_mb_tessera":  kv_mb_tessera,
-        "kv_cache_mb_naive":    kv_mb_naive,
-        "kv_savings_ratio":     kv_mb_naive / kv_mb_tessera if kv_mb_tessera > 0 else 0.0,
+        "total_seals": float(total_seals),
+        "dedup_hits": float(dedup_hits),
+        "sharing_rate": sharing_rate,
+        "unique_blocks": float(unique_blocks),
+        "expected_unique": float(doc_blocks + n_agents * sys_blocks_per_agent),
+        "kv_cache_mb_tessera": kv_mb_tessera,
+        "kv_cache_mb_naive": kv_mb_naive,
+        "kv_savings_ratio": kv_mb_naive / kv_mb_tessera if kv_mb_tessera > 0 else 0.0,
     }
 
 
@@ -124,10 +124,14 @@ def main() -> None:
 
     expected_sharing = (stats["n_agents"] - 1) / stats["n_agents"]
     print()
-    print(f"Expected sharing_rate ≥ {expected_sharing:.3f} "
-          f"(document blocks dedupe across all but the first agent)")
-    print(f"Expected unique_blocks ≈ {stats['expected_unique']:.0f} "
-          f"= doc_blocks + n_agents × sys_blocks_per_agent")
+    print(
+        f"Expected sharing_rate ≥ {expected_sharing:.3f} "
+        f"(document blocks dedupe across all but the first agent)"
+    )
+    print(
+        f"Expected unique_blocks ≈ {stats['expected_unique']:.0f} "
+        f"= doc_blocks + n_agents × sys_blocks_per_agent"
+    )
 
 
 if __name__ == "__main__":

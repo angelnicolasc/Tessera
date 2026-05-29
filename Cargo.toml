@@ -9,7 +9,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.85"
 authors = ["Tessera Contributors"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/angelnicolasc/tessera"
@@ -42,15 +42,17 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 
 # Metrics
-prometheus = "0.13"
+prometheus = "0.14"
 lazy_static = "1.5"
 
 # ANN
 usearch = "2.12"
 
 # Python bindings
-pyo3 = { version = "0.22", features = ["extension-module", "abi3-py311"] }
-numpy = "0.22"
+# 0.24+ closes RUSTSEC-2025-0020 (PyString::from_object overflow). Source already uses the
+# Bound<'py, T> API so the bump is mechanical.
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py311"] }
+numpy = "0.24"
 
 # Test / bench
 criterion = { version = "0.5", features = ["html_reports"] }

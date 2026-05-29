@@ -12,17 +12,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "python"))
 
-import pytest  # noqa: E402
+import pytest
 
-from tessera.config import TesseraConfig  # noqa: E402
-from tessera.kernel_dispatch import get_mla_backend  # noqa: E402
+from tessera.config import TesseraConfig
+from tessera.kernel_dispatch import get_mla_backend
 
 
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_kernel_throughput_smoke() -> None:
     pytest.importorskip("torch")
-    import torch  # noqa: PLC0415
+    import torch
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")

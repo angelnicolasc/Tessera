@@ -14,12 +14,10 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from tessera import _native
 from tessera.config import TesseraConfig
 from tessera.fp8_calibrate import load_scales, save_scales
-
 
 # ──────────── helpers ─────────────────────────────────────────────────────────
 
@@ -120,14 +118,14 @@ def test_post_prefill_seal_no_exception_fp8(tmp_path: Path) -> None:
     scales_file = tmp_path / "scales.json"
     save_scales({i: float(i + 1) * 0.001 for i in range(4)}, scales_file)
 
-    from tessera.vllm_plugin import TesseraBlockAllocator  # noqa: PLC0415
+    from tessera.vllm_plugin import TesseraBlockAllocator
 
     cfg = TesseraConfig.from_dict(_fp8_config_dict(str(scales_file)))
     allocator = TesseraBlockAllocator(cfg)
 
     # Allocate and fill a block so it can be sealed.
     scheme = _native.CompressionScheme.mla_latent(32, 8)
-    native_cfg = _native.MlaBlockConfig(scheme, 4, 64, _native.CkvDtype.Fp8E4m3, 0)
+    _native.MlaBlockConfig(scheme, 4, 64, _native.CkvDtype.Fp8E4m3, 0)
     block_id = allocator._manager.allocate(1, 0, 64)
     allocator._manager.fill_primary_test_pattern(block_id, 0xAB)
 
