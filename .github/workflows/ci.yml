@@ -48,9 +48,13 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
       - name: cargo test
-        run: cargo test --workspace
+        # tessera-py is a Python extension (cdylib via pyo3 `extension-module`); building
+        # it under `cargo test` tries to link against libpython statically and fails on
+        # macOS/Windows with "_Py_NoneStruct" symbols not found. Python-side coverage runs
+        # in the separate Test Python jobs below, so excluding it here is safe.
+        run: cargo test --workspace --exclude tessera-py
       - name: cargo bench --no-run
-        run: cargo bench --workspace --no-run
+        run: cargo bench --workspace --exclude tessera-py --no-run
 
   lint-python:
     name: Lint Python
@@ -64,7 +68,9 @@ jobs:
       - name: Install lint tools
         run: |
           python -m pip install --upgrade pip
-          pip install ruff pyright pydantic numpy
+          # Install runtime deps so pyright can resolve `import xxhash`, `import usearch`
+          # etc. without going to "unknown" for every typed expression downstream.
+          pip install ruff pyright pydantic numpy xxhash usearch
       - name: ruff check
         run: ruff check python tests benchmarks
       - name: ruff format
@@ -125,7 +131,10 @@ jobs:
 
   build-cuda:
     name: Build CUDA (compile-only)
-    runs-on: ubuntu-latest
+    # Pinned to 22.04: NVIDIA stopped shipping `cuda-nvcc-12-4` packages for Ubuntu 24.04
+    # ("noble"); ubuntu-latest moved to 24.04 and the install step now fails. 22.04 still
+    # has the 12.4 archive that matches the workspace cudarc `cuda-12040` feature pin.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85.0

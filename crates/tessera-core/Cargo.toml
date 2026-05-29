@@ -33,6 +33,7 @@ otel-rust = [
     "dep:opentelemetry",
     "dep:opentelemetry_sdk",
     "dep:opentelemetry-otlp",
+    "dep:tracing-subscriber",
 ]
 # Enables test-only helpers like fill_test_pattern on production backends.
 testing = []
@@ -60,6 +61,8 @@ tracing-opentelemetry = { workspace = true, optional = true }
 opentelemetry = { workspace = true, optional = true }
 opentelemetry_sdk = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, optional = true }
+# Subscriber registry used by `init_otlp_tracing` when the OTel feature is on.
+tracing-subscriber = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest.workspace = true

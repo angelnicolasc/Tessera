@@ -28,7 +28,6 @@ tessera-index = { path = "crates/tessera-index", version = "0.1.0" }
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # Concurrency primitives
 dashmap = "5.5"
@@ -78,14 +77,17 @@ tokio = { version = "1.40", features = ["sync", "macros", "rt-multi-thread", "ti
 async-trait = "0.1"
 futures = "0.3"
 
-# Sprint 4: optional OTLP tracing bridge for the Rust core. All four crates are
-# explicitly version-pinned to a single compatible set; mismatched versions in the
-# opentelemetry ecosystem are a notorious source of build pain. Pinned to 0.27/0.26
-# (the last set with stable APIs before the 0.28 ecosystem refresh).
-tracing-opentelemetry = "0.27"
-opentelemetry = "0.26"
-opentelemetry_sdk = { version = "0.26", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.26", features = ["grpc-tonic"] }
+# Sprint 4: optional OTLP tracing bridge for the Rust core. The observability.rs
+# bridge was written for the 0.27 API set (SpanExporter::builder().with_tonic(),
+# trace::Builder::with_resource, etc.). 0.26 lacks both — pin to the matched 0.27
+# ecosystem.
+tracing-opentelemetry = "0.28"
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
+# tracing-subscriber is used by observability::init_otlp_tracing under the otel-rust
+# feature; it must be a regular (optional) dep, not just dev.
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
