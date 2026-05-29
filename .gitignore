@@ -57,3 +57,4 @@ benchmarks/results/
 # Internal development
 Research/
 DEVLOG.md
+Cargo.lock
