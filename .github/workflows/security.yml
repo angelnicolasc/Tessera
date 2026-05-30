@@ -19,7 +19,9 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
-      - run: cargo audit
+      # cargo-audit does not read deny.toml's `[advisories].ignore`, so the protobuf
+      # advisory has to be re-declared here. See deny.toml for the justification.
+      - run: cargo audit --ignore RUSTSEC-2024-0437
 
   cargo-deny:
     runs-on: ubuntu-latest

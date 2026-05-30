@@ -81,17 +81,19 @@ fn recently_touched_block_survives_lru_eviction() {
     // Touch `newer` to give it a higher epoch (simulating recent access).
     let _ = mgr.primary_ptr(newer);
 
-    // Pool is full; the 3rd allocation must evict the LRU block (older).
-    let _third = mgr.allocate(3, TokenRange::new(128, 192)).unwrap();
-
-    // `newer` (higher epoch) must still be alive; `older` (lower epoch) was evicted.
-    assert!(
-        mgr.primary_ptr(newer).is_some(),
-        "recently-touched block must survive eviction"
+    // Pool is full; the 3rd allocation must evict the LRU block (older). Because the
+    // freed slot is recycled through the free-list, the new allocation lands on the
+    // same `BlockId` that `older` held — which is exactly what proves LRU semantics
+    // (a primary_ptr lookup on `older` would now succeed for the recycled block,
+    // so we can't use is_some/is_none here; check id equality instead).
+    let third = mgr.allocate(3, TokenRange::new(128, 192)).unwrap();
+    assert_eq!(
+        third, older,
+        "least-recently-touched block id must be the one recycled"
     );
-    assert!(
-        mgr.primary_ptr(older).is_none(),
-        "least-recently-touched block must be evicted"
+    assert_ne!(
+        third, newer,
+        "recently-touched block must survive eviction"
     );
 }
 

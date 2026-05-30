@@ -89,6 +89,16 @@ fn metric_families_appear_in_snapshot_text() {
     metrics::DISTRIBUTED_INDEX_LOCAL_HITS_TOTAL.inc();
     metrics::DISTRIBUTED_INDEX_MISSES_TOTAL.inc();
     metrics::DISTRIBUTED_INDEX_FANOUT_LATENCY_SECONDS.observe(0.0001);
+    // The remaining two families are exercised by the async tests above, but those
+    // share process-global prometheus state and may not have run yet when this test
+    // executes (cargo-test runs in parallel). Touch them here so the assertion
+    // doesn't depend on test ordering.
+    metrics::CROSS_RANK_TRANSFERS_TOTAL
+        .with_label_values(&["r0", "r1", "fetch"])
+        .inc();
+    metrics::DISTRIBUTED_INDEX_REMOTE_HITS_TOTAL
+        .with_label_values(&["r1"])
+        .inc();
 
     let text = metrics::snapshot_text();
     for family in [

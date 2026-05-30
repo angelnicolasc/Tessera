@@ -129,7 +129,9 @@ def test_post_prefill_seal_no_exception_fp8(tmp_path: Path) -> None:
     block_id = allocator._manager.allocate(1, 0, 64)
     allocator._manager.fill_primary_test_pattern(block_id, 0xAB)
 
-    c_kv = np.zeros((64, 32), dtype=np.float32)
+    # Shape must match `[num_layers, block_size_tokens, d_c]` (4, 64, 32) — the segment
+    # index's descriptor_from_ckv asserts ndim==3 and reduces over (layer, token).
+    c_kv = np.zeros((4, 64, 32), dtype=np.float32)
     # Must not raise — _write_fp8_scales is a no-op on the CPU mock.
     canonical_id = allocator.post_prefill_seal(block_id, c_kv)
     assert isinstance(canonical_id, int)

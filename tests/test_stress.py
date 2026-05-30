@@ -41,7 +41,11 @@ def test_concurrent_threaded_lifecycle_no_leaks() -> None:
         for i in range(blocks_per_thread):
             start = token_start + i * 64
             bid = manager.allocate(req_id, start, start + 64)
-            manager.fill_primary_test_pattern(bid, 0xAA)
+            # Vary the fill pattern per (req_id, i) so seal() doesn't dedup blocks
+            # together — identical content would collapse to a single canonical block
+            # and the ref-count assertion at the end would surface as a phantom leak.
+            pattern = ((req_id * 17 + i) & 0xFF) | 0x40
+            manager.fill_primary_test_pattern(bid, pattern)
             bids.append(bid)
         for bid in bids:
             manager.seal(bid)
@@ -67,9 +71,11 @@ def test_memory_pressure_eviction_keeps_system_alive() -> None:
     manager = _make_manager(total)
 
     # Alloc+seal 90 blocks → each becomes a Tier-b candidate (sealed, ref_count=1, not indexed).
+    # Pattern must vary per block; with a constant 0x55 fill every seal() would compute the
+    # same content hash and dedup down to a single canonical block.
     for i in range(90):
         bid = manager.allocate(i + 1, 0, 64)
-        manager.fill_primary_test_pattern(bid, 0x55)
+        manager.fill_primary_test_pattern(bid, ((i + 1) & 0xFF))
         manager.seal(bid)
 
     assert manager.used_blocks == 90
@@ -90,9 +96,11 @@ def test_memory_pressure_metrics_reflect_evictions() -> None:
     manager = _make_manager(total)
 
     # Saturate the pool with sealed blocks, then force one eviction.
+    # Vary the fill pattern so each seal() yields a distinct content hash (otherwise
+    # dedup collapses all blocks to one canonical and no eviction is needed).
     for i in range(total):
         bid = manager.allocate(i + 1, 0, 64)
-        manager.fill_primary_test_pattern(bid, 0x77)
+        manager.fill_primary_test_pattern(bid, ((i + 1) & 0xFF))
         manager.seal(bid)
 
     # One more allocation triggers eviction of the LRU Tier-b block.

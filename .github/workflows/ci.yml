@@ -141,6 +141,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: cuda
+      - name: Install gcc-12 (usearch's numkong build emits AVX-512-FP16 target
+          attributes that ubuntu-22.04's default gcc-11 does not recognise)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-12 g++-12
+          echo "CC=gcc-12" >> "$GITHUB_ENV"
+          echo "CXX=g++-12" >> "$GITHUB_ENV"
       - name: Install CUDA toolkit 12.4
         uses: Jimver/cuda-toolkit@v0.2.18
         with:

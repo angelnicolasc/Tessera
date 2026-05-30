@@ -89,8 +89,10 @@ def descriptor_from_ckv(c_kv: NDArray[np.floating]) -> NDArray[np.float32]:
 class SegmentIndex:
     """Two-layer content-addressed segment index over MLA ``c_kv`` blocks."""
 
-    DEFAULT_LATENCY_BUDGET_US: int = 500
-    """Default async HNSW lookup budget. Miss-on-timeout is safe."""
+    DEFAULT_LATENCY_BUDGET_US: int = 50_000
+    """Default async HNSW lookup budget (50 ms). Miss-on-timeout is safe; the previous
+    500 μs default was below the floor of `asyncio.timeout` + thread-executor dispatch
+    + usearch search even on idle machines, so it always timed out into a false miss."""
 
     def __init__(
         self,
