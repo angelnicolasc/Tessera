@@ -90,6 +90,7 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=50 \
             --timeout=60 \
+            --timeout-method=thread \
             -m "not gpu"
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4

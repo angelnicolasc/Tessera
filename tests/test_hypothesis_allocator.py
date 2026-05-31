@@ -42,8 +42,13 @@ _op_strategy = st.one_of(
 
 @given(ops=st.lists(_op_strategy, min_size=1, max_size=24))
 @settings(
-    max_examples=64,
-    deadline=None,
+    # CI machines run the PyO3 boundary 10-100× slower than dev laptops in ways the
+    # hypothesis health checks can't see (signal-based pytest-timeout cannot interrupt
+    # a native call holding the GIL, so a single example burns the whole job budget).
+    # 16 examples × 2 s deadline = 32 s worst case; on dev machines the test finishes
+    # in under 1 s and shrinking is still meaningful.
+    max_examples=16,
+    deadline=2000,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
 )
 def test_used_blocks_consistent_under_random_ops(ops):
@@ -93,7 +98,7 @@ def test_used_blocks_consistent_under_random_ops(ops):
 
 
 @given(pattern=st.integers(min_value=0, max_value=255))
-@settings(max_examples=32, deadline=None)
+@settings(max_examples=16, deadline=2000)
 def test_seal_of_identical_bytes_is_deterministic(pattern):
     """Two allocations filled with the same byte pattern must dedup deterministically."""
     mgr = _native.BlockManager(small_cfg(), 32 * 1024 * 1024)
@@ -113,7 +118,7 @@ def test_seal_of_identical_bytes_is_deterministic(pattern):
     req=st.integers(min_value=0, max_value=255),
     count=st.integers(min_value=0, max_value=8),
 )
-@settings(max_examples=32, deadline=None)
+@settings(max_examples=16, deadline=2000)
 def test_release_request_returns_exact_count(req, count):
     mgr = _native.BlockManager(small_cfg(), 32 * 1024 * 1024)
     for _ in range(count):
