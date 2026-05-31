@@ -204,6 +204,15 @@ async fn mid_stream_push_failure_releases_reservation_and_preserves_source() {
     }
     let src_used_before = src.used_blocks();
 
+    // `RESERVATIONS_ACTIVE{rank="r1"}` is a process-global prometheus gauge shared with
+    // every other test in this binary that touches rank 1. Capture the baseline before the
+    // transfer so the assertion measures *this test's* delta rather than the absolute
+    // counter (cargo-test parallelism + lazy_static metrics broke the absolute-zero check
+    // on Windows/macOS runners).
+    let active_before = tessera_core::metrics::RESERVATIONS_ACTIVE
+        .with_label_values(&["r1"])
+        .get();
+
     let result = src
         .transfer_request_to_rank(req_id, RankId(1), &transport)
         .await;
@@ -214,14 +223,12 @@ async fn mid_stream_push_failure_releases_reservation_and_preserves_source() {
     assert_eq!(dst.used_blocks(), 0);
     // No active reservations leaked at destination (release_reservation was called on abort,
     // OR the reserve itself failed under ALL_DROPS — either way, no leftovers).
-    // We can't directly read the destination's reservations DashMap; instead we assert via
-    // the metric that no reservations are active.
     let active = tessera_core::metrics::RESERVATIONS_ACTIVE
         .with_label_values(&["r1"])
         .get();
-    assert_eq!(
-        active, 0.0,
-        "no reservations should leak on abort; observed {active}"
+    assert!(
+        (active - active_before).abs() < f64::EPSILON,
+        "no reservations should leak on abort; before={active_before}, after={active}"
     );
 }
 
