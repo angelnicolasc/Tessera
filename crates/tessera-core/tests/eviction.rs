@@ -91,10 +91,7 @@ fn recently_touched_block_survives_lru_eviction() {
         third, older,
         "least-recently-touched block id must be the one recycled"
     );
-    assert_ne!(
-        third, newer,
-        "recently-touched block must survive eviction"
-    );
+    assert_ne!(third, newer, "recently-touched block must survive eviction");
 }
 
 /// Shared blocks (ref_count > 1) must never be evicted regardless of pool pressure.
