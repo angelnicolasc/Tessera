@@ -146,12 +146,6 @@ jobs:
     # has the 12.4 archive that matches the workspace cudarc `cuda-12040` feature pin.
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    # `continue-on-error` here makes Build CUDA an advisory check rather than a release
-    # blocker. The current cudarc 0.12 API in device/cuda.rs uses error-conversions
-    # that no longer hold in the latest 0.12.x patch (DriverError no longer implements
-    # std::error::Error). Fixing it properly means a cudarc bump + API migration —
-    # out of scope for this CI-unblock PR. Tracked separately.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85.0
@@ -244,14 +238,13 @@ jobs:
 
   ci-gate:
     name: CI gate
-    # build-cuda is intentionally NOT a gate dependency (continue-on-error: true);
-    # see the comment on that job for the reason.
     needs:
       - lint-rust
       - test-rust
       - lint-python
       - test-python
       - build-wheel
+      - build-cuda
       - build-nccl
       - build-otel-rust
       - test-multirank-python

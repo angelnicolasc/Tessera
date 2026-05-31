@@ -16,9 +16,16 @@
 
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
-use cudarc::driver::{CudaDevice, CudaSlice, DevicePtr as CdarcPtr, DeviceSlice};
+use anyhow::{anyhow, Context, Result};
+use cudarc::driver::{CudaDevice, CudaSlice, DevicePtr as CdarcPtr};
 use parking_lot::Mutex;
+
+/// Wrap a `cudarc` `DriverError` into an `anyhow::Error`. cudarc 0.12.1 dropped the
+/// `std::error::Error` impl on `DriverError`, so the usual `?` / `.context()` chain
+/// no longer compiles — adapt via `.map_err` at every call site.
+fn cuda_err(e: cudarc::driver::DriverError) -> anyhow::Error {
+    anyhow!("cudarc driver error: {e:?}")
+}
 
 use super::{DeviceBackend, DevicePtr, RegionKind};
 
@@ -47,6 +54,7 @@ impl CudaBackend {
     /// Initialise CUDA on the given device ordinal.
     pub fn new(device_ordinal: usize) -> Result<Self> {
         let device = CudaDevice::new(device_ordinal)
+            .map_err(cuda_err)
             .with_context(|| format!("CUDA init failed for device {device_ordinal}"))?;
         Ok(Self {
             inner: Arc::new(Mutex::new(Inner {
@@ -73,10 +81,11 @@ impl DeviceBackend for CudaBackend {
         let slice: CudaSlice<u8> = inner
             .device
             .alloc_zeros::<u8>(bytes as usize)
+            .map_err(cuda_err)
             .with_context(|| format!("CUDA alloc {bytes} bytes ({kind:?}) failed"))?;
-        // cudarc 0.12: device_ptr() returns sys::CUdeviceptr (u64), not a reference.
-        // Cast directly to usize — do not dereference (u64 is not a pointer type in Rust).
-        let raw_base = slice.device_ptr() as usize;
+        // cudarc 0.12.1: device_ptr() returns `&CUdeviceptr` (`&u64`); dereference
+        // before casting.
+        let raw_base = *slice.device_ptr() as usize;
         inner.regions.push(Region {
             slice,
             raw_base,
@@ -90,18 +99,41 @@ impl DeviceBackend for CudaBackend {
     }
 
     fn memcpy(&self, src: DevicePtr, dst: DevicePtr, bytes: u64) -> Result<()> {
-        let inner = self.inner.lock();
+        let mut inner = self.inner.lock();
         let (si, so) = Self::locate(&inner, src).context("cuda memcpy: src not found")?;
         let (di, dof) = Self::locate(&inner, dst).context("cuda memcpy: dst not found")?;
         let n = bytes as usize;
-        // cudarc's slice view supports `try_clone` (dtod) at the slice level. We use a raw
-        // dtod copy via the driver API to handle arbitrary offsets/sizes.
-        let src_view = inner.regions[si].slice.slice(so..so + n);
-        let mut dst_view = inner.regions[di].slice.slice_mut(dof..dof + n);
-        inner
-            .device
-            .dtod_copy(&src_view, &mut dst_view)
-            .context("cuda dtod copy failed")?;
+        // `device` is `Arc<CudaDevice>` — clone the handle once so we can hold the
+        // immutable device reference and a `&mut Region.slice` concurrently without
+        // borrow-checker conflicts on `inner`.
+        let device = Arc::clone(&inner.device);
+        if si == di {
+            // Same region: stage through host (cudarc dtod_copy requires distinct slices).
+            let host: Vec<u8> = {
+                let view = inner.regions[si].slice.slice(so..so + n);
+                device.dtoh_sync_copy(&view).map_err(cuda_err)?
+            };
+            let mut dst_view = inner.regions[di].slice.slice_mut(dof..dof + n);
+            device
+                .htod_sync_copy_into(&host, &mut dst_view)
+                .map_err(cuda_err)
+                .context("cuda dtod self-copy via host failed")?;
+        } else {
+            // Distinct regions: split the vec to get independent mutable + immutable borrows.
+            let (lo, hi) = if si < di { (si, di) } else { (di, si) };
+            let (left, right) = inner.regions.split_at_mut(hi);
+            let (src_region, dst_region) = if si < di {
+                (&left[lo], &mut right[0])
+            } else {
+                (&right[0], &mut left[lo])
+            };
+            let src_view = src_region.slice.slice(so..so + n);
+            let mut dst_view = dst_region.slice.slice_mut(dof..dof + n);
+            device
+                .dtod_copy(&src_view, &mut dst_view)
+                .map_err(cuda_err)
+                .context("cuda dtod copy failed")?;
+        }
         Ok(())
     }
 
@@ -109,16 +141,19 @@ impl DeviceBackend for CudaBackend {
         let inner = self.inner.lock();
         let (i, off) = Self::locate(&inner, ptr).context("cuda read_bytes: ptr not found")?;
         let view = inner.regions[i].slice.slice(off..off + len);
-        let host: Vec<u8> = inner.device.dtoh_sync_copy(&view)?;
+        let host: Vec<u8> = inner.device.dtoh_sync_copy(&view).map_err(cuda_err)?;
         Ok(host)
     }
 
     fn fill_pattern(&self, ptr: DevicePtr, byte: u8, len: usize) -> Result<()> {
-        let inner = self.inner.lock();
+        let mut inner = self.inner.lock();
         let (i, off) = Self::locate(&inner, ptr).context("cuda fill: ptr not found")?;
         let host = vec![byte; len];
+        let device = Arc::clone(&inner.device);
         let mut view = inner.regions[i].slice.slice_mut(off..off + len);
-        inner.device.htod_sync_copy_into(&host, &mut view)?;
+        device
+            .htod_sync_copy_into(&host, &mut view)
+            .map_err(cuda_err)?;
         Ok(())
     }
 
@@ -126,10 +161,13 @@ impl DeviceBackend for CudaBackend {
         if bytes.is_empty() {
             return Ok(());
         }
-        let inner = self.inner.lock();
+        let mut inner = self.inner.lock();
         let (i, off) = Self::locate(&inner, ptr).context("cuda write_bytes: ptr not found")?;
+        let device = Arc::clone(&inner.device);
         let mut view = inner.regions[i].slice.slice_mut(off..off + bytes.len());
-        inner.device.htod_sync_copy_into(bytes, &mut view)?;
+        device
+            .htod_sync_copy_into(bytes, &mut view)
+            .map_err(cuda_err)?;
         Ok(())
     }
 
