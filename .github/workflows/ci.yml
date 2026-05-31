@@ -54,7 +54,16 @@ jobs:
         # it under `cargo test` tries to link against libpython statically and fails on
         # macOS/Windows with "_Py_NoneStruct" symbols not found. Python-side coverage runs
         # in the separate Test Python jobs below, so excluding it here is safe.
-        run: cargo test --workspace --exclude tessera-py
+        #
+        # --test-threads=1 + --report-time: previous round of runs sat on `cargo test` for
+        # 35+ minutes across every matrix variant, which suggests a parallel-execution
+        # interaction (poisoned mutex on a shared lazy_static prometheus gauge is a
+        # plausible candidate) rather than a single slow test. Serialising surfaces the
+        # culprit by name + duration, and `--nocapture` keeps the stream live so a hung
+        # job can be diagnosed without waiting for the timeout-minutes cap.
+        run: cargo test --workspace --exclude tessera-py -- --test-threads=1 --report-time --nocapture
+        env:
+          RUST_BACKTRACE: "1"
       - name: cargo bench --no-run
         run: cargo bench --workspace --exclude tessera-py --no-run
 
