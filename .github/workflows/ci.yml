@@ -61,7 +61,7 @@ jobs:
         # plausible candidate) rather than a single slow test. Serialising surfaces the
         # culprit by name + duration, and `--nocapture` keeps the stream live so a hung
         # job can be diagnosed without waiting for the timeout-minutes cap.
-        run: cargo test --workspace --exclude tessera-py -- --test-threads=1 --report-time --nocapture
+        run: cargo test --workspace --exclude tessera-py -- --test-threads=1 --nocapture
         env:
           RUST_BACKTRACE: "1"
       - name: cargo bench --no-run
