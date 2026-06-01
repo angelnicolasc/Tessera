@@ -15,7 +15,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -27,6 +26,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # ghcr.io rejects repository names with uppercase letters; the upstream
+      # `${{ github.repository }}` is `angelnicolasc/Tessera` (capital T) which
+      # broke `docker pull` in the smoke-test step. Compute a lowercase
+      # alternative once and reuse it everywhere downstream.
+      - name: Compute lowercase image name
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
