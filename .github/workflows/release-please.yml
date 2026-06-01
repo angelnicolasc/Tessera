@@ -11,9 +11,15 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
+      # release-please v4 dropped the inline `package-name` / `changelog-path` /
+      # `release-type` inputs in favour of two config files (release-please-config.json
+      # + .release-please-manifest.json). Without those it bails on this workspace
+      # because the root Cargo.toml has only `[workspace]` (no `[package]`), so the
+      # rust strategy can't resolve a `package.version`. See the json files at repo
+      # root for the manifest-based config.
       - uses: googleapis/release-please-action@v4
         with:
-          release-type: rust
-          package-name: tessera
-          changelog-path: CHANGELOG.md
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
