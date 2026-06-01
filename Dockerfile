@@ -8,9 +8,15 @@
 # with `--features cuda`. The CPU-only wheel produced here is safe on any machine.
 
 # ──────────── Stage 1: builder ───────────────────────────────────────────────
-FROM rust:1.82-slim AS builder
+# 1.85 matches the workspace's rust-toolchain.toml; needed for edition2024
+# transitives (clap_lex, idna_adapter, …).
+FROM rust:1.85-slim AS builder
 
+# g++ is required by usearch's `numkong` C subdep (AVX-512-FP16 intrinsics);
+# the default slim image only ships `cc`. python3-dev + pkg-config + libssl-dev
+# cover pyo3 / openssl-sys build needs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        g++ \
         python3-dev \
         python3-pip \
         pkg-config \
