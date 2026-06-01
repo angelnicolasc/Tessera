@@ -16,11 +16,11 @@
 
 [![CI](https://github.com/angelnicolasc/tessera/actions/workflows/ci.yml/badge.svg)](https://github.com/angelnicolasc/tessera/actions/workflows/ci.yml)
 [![Nightly Bench](https://github.com/angelnicolasc/tessera/actions/workflows/bench.yml/badge.svg)](https://github.com/angelnicolasc/tessera/actions/workflows/bench.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/angelnicolasc/tessera?logo=codecov)](https://codecov.io/gh/angelnicolasc/tessera)
+[![Coverage](https://img.shields.io/codecov/c/github/angelnicolasc/Tessera?logo=codecov)](https://codecov.io/gh/angelnicolasc/Tessera)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/rust-1.82%2B-orange?logo=rust)](rust-toolchain.toml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python)](pyproject.toml)
-[![Docs](https://img.shields.io/badge/docs-mdbook-success)](https://angelnicolasc.github.io/tessera)
+[![Docs](https://img.shields.io/badge/docs-mdbook-success)](https://angelnicolasc.github.io/Tessera)
 [![Status](https://img.shields.io/badge/status-Sprint%205%20V4%20compliance-brightgreen)](CHANGELOG.md)
 [![Version](https://img.shields.io/badge/version-0.6.0--sprint5-blue)](CHANGELOG.md)
 [![Wheels](https://github.com/angelnicolasc/tessera/actions/workflows/wheel.yml/badge.svg)](https://github.com/angelnicolasc/tessera/actions/workflows/wheel.yml)
@@ -30,33 +30,55 @@
 ## What it does
 
 ```mermaid
-flowchart LR
-    subgraph vLLM["vLLM V1 engine"]
-        S[Scheduler]
-    end
-    subgraph Tessera["Tessera block manager (rank-aware)"]
-        BA[BlockAllocator plugin]
-        BM[Rust block manager<br/>alloc · seal · CoW · evict · release]
-        SC[State Cache<br/>per-request arena<br/>SWA + uncompressed tail]
-        SI[Segment index<br/>xxh3 + HNSW async<br/>distributed fan-out]
-        ST[Cross-agent share table<br/>ref-counted CoW]
-        RT[RankTransport<br/>Mock · P2pCuda · NCCL]
-        DK[DiskBackend<br/>3 SWA strategies]
-    end
-    subgraph Kernels["Attention kernels (upstream)"]
-        FMLA[FlashMLA<br/>SM ≥ 9.0]
-        FINF[FlashInfer MLA<br/>Ampere+]
-        TILE[TileLang V4<br/>CSA + HCA cores]
-        TRI[Triton fallback]
+flowchart TB
+    %% Estilos de los nodos (Paleta Mocha/Oscura limpia)
+    classDef core fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4,stroke-width:2px;
+    classDef cache fill:#181825,stroke:#89b4fa,color:#cdd6f4;
+    classDef io fill:#181825,stroke:#f38ba8,color:#cdd6f4;
+    classDef kernel fill:#11111b,stroke:#fab387,color:#cdd6f4;
+
+    subgraph vLLM["vLLM V1 Engine"]
+        S[Scheduler]:::core
     end
 
+    subgraph Tessera["Tessera Block Manager (Rank-Aware)"]
+        subgraph TesseraCore["Core Logic"]
+            BA[BlockAllocator Plugin]:::core
+            BM["Rust Block Manager<br/><b>alloc · seal · CoW · evict · release</b>"]:::core
+        end
+
+        subgraph TesseraStorage["State & Indexing"]
+            SC["State Cache<br/><small>per-request arena<br/>SWA + uncompressed tail</small>"]:::cache
+            SI["Segment Index<br/><small>xxh3 + HNSW async<br/>distributed fan-out</small>"]:::cache
+            ST["Cross-Agent Share Table<br/><small>ref-counted CoW</small>"]:::cache
+        end
+
+        subgraph TesseraIO["Transport & Backend"]
+            RT["RankTransport<br/><small>Mock · P2pCuda · NCCL</small>"]:::io
+            DK["DiskBackend<br/><small>3 SWA strategies</small>"]:::io
+        end
+    end
+
+    subgraph Kernels["Attention Kernels (Upstream)"]
+        FMLA["FlashMLA<br/><small>SM ≥ 9.0</small>"]:::kernel
+        FINF["FlashInfer MLA<br/><small>Ampere+</small>"]:::kernel
+        TILE["TileLang V4<br/><small>CSA + HCA cores</small>"]:::kernel
+        TRI["Triton Fallback"]:::kernel
+    end
+
+    %% Flujo Principal de Ejecución
     S --> BA
     BA --> BM
-    BA --> SC
-    BA --> SI
-    BA --> ST
-    BM --> RT
-    BM --> DK
+
+    %% Conexiones de Soporte / Estado (Líneas punteadas para limpiar la vista)
+    BA -.-> SC
+    BA -.-> SI
+    BA -.-> ST
+    
+    BM -.-> RT
+    BM -.-> DK
+
+    %% Despacho a Kernels de Cómputo
     BM --> FMLA
     BM --> FINF
     BM --> TILE
