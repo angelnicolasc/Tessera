@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = ["torch>=2.4"]
+torch = ["torch>=2.12.0"]
 vllm = ["vllm>=0.6"]
 flashinfer = ["flashinfer>=0.2"]
 flash-mla = ["flash-mla"]
