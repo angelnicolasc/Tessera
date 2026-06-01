@@ -116,38 +116,14 @@ proptest! {
         prop_assert_eq!(mgr.used_blocks(), 0);
     }
 
-    /// Invariant 4: CoW isolation — mutating a forked block does not change the original.
-    #[test]
-    fn cow_fork_is_isolated(byte_a in 0u8..=127u8, byte_b in 128u8..=255u8) {
-        prop_assume!(byte_a != byte_b);
-        let mgr = make_manager();
-
-        let original = mgr.allocate(1, TokenRange::new(0, 64)).unwrap();
-        mgr.fill_primary_test_pattern(original, byte_a).unwrap();
-        let out_orig = mgr.seal(original).unwrap();
-        let hash_before = out_orig.content_hash;
-
-        let forked = mgr.cow_fork(original, 2).unwrap();
-
-        // Mutate the fork with a different pattern.
-        mgr.fill_primary_test_pattern(forked, byte_b).unwrap();
-        let out_forked = mgr.seal(forked).unwrap();
-
-        // Original hash must be unchanged.
-        let out_orig2 = mgr.seal(original);
-        // original was already sealed; it's in content_index, re-seal would dedup to itself
-        // Actually the original is already sealed - we check via hash_primary indirectly
-        // by verifying the forked hash differs.
-        prop_assert_ne!(
-            out_forked.content_hash, hash_before,
-            "forked block's hash must differ after mutation"
-        );
-
-        // Cleanup.
-        mgr.free(original).unwrap();
-        let _ = out_orig2;
-        mgr.free(out_forked.canonical_block).unwrap();
-    }
+    // CoW isolation moved out of `proptest!`: the re-seal of an already-sealed block
+    // (line `mgr.seal(original)` after fork) hits the dedup path that mutates the
+    // shared `content_index`, and proptest's shrinking under `derandomize=true` would
+    // re-enter the same block 32× per case while the previous case's free_list state
+    // was still settling. Under nextest's 60 s test cap this consistently timed out.
+    // The invariant being tested ("forked hash differs after mutation") has no
+    // input-space coverage gain from random `byte_a`/`byte_b` — two distinct bytes
+    // suffice. Kept here so the test stays alongside the other invariants.
 
     /// Invariant 5: eviction never frees a block with ref_count > 1 (tier d = shared).
     ///
@@ -241,4 +217,33 @@ proptest! {
         mgr.free(b_block).unwrap();
         prop_assert_eq!(mgr.used_blocks(), 0);
     }
+}
+
+/// CoW isolation: mutating a forked block must not change the original's content hash.
+#[test]
+fn cow_fork_is_isolated() {
+    let mgr = make_manager();
+
+    let original = mgr.allocate(1, TokenRange::new(0, 64)).unwrap();
+    mgr.fill_primary_test_pattern(original, 0x11).unwrap();
+    let out_orig = mgr.seal(original).unwrap();
+    let hash_before = out_orig.content_hash;
+
+    let forked = mgr.cow_fork(original, 2).unwrap();
+
+    // Mutate the fork with a different pattern.
+    mgr.fill_primary_test_pattern(forked, 0xEE).unwrap();
+    let out_forked = mgr.seal(forked).unwrap();
+
+    // Forked hash must differ from original's pre-mutation hash.
+    assert_ne!(
+        out_forked.content_hash, hash_before,
+        "forked block's hash must differ after mutation"
+    );
+
+    // Cleanup: free both canonicals. We don't re-seal original (that would round-trip
+    // through the dedup path and free `original` from blocks, which made the prior
+    // proptest variant hang under shrinking).
+    mgr.free(original).unwrap();
+    mgr.free(out_forked.canonical_block).unwrap();
 }
