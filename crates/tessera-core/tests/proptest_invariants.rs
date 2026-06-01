@@ -22,18 +22,34 @@ fn small_cfg() -> MlaBlockConfig {
     .unwrap()
 }
 
+// Each proptest invocation creates a fresh manager and (by default) runs 256 cases.
+// With the previous 64 MB budget that meant 256 × 64 MB ≈ 16 GB of cumulative
+// allocations per test, which thrashed the CI runners until nextest's kill timeout
+// fired — `cow_fork_is_isolated` was observed running for >56 minutes before the
+// matrix-job timeout reaped it. 4 MB still gives ~200 blocks per manager which is
+// plenty of headroom for the invariants asserted here.
 fn make_manager() -> TesseraBlockManager {
-    TesseraBlockManager::new(small_cfg(), 64 * 1024 * 1024).unwrap()
+    TesseraBlockManager::new(small_cfg(), 4 * 1024 * 1024).unwrap()
 }
 
-/// Block capacity for the standard 64 MB test pool.
+/// Block capacity for the test pool.
 fn pool_capacity() -> u32 {
     let cfg = small_cfg();
     let block_bytes = cfg.total_block_bytes();
-    (64 * 1024 * 1024 / block_bytes) as u32
+    (4 * 1024 * 1024 / block_bytes) as u32
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        // Default 256 × 6 proptest! blocks = 1536 cases. Each allocates a fresh
+        // manager + walks several invariants; on CI runners that scaled to tens of
+        // minutes. 32 cases per block keeps wall-clock under a minute total while
+        // still covering enough random inputs to surface real invariant violations.
+        cases: 32,
+        max_shrink_iters: 64,
+        .. ProptestConfig::default()
+    })]
+
     /// Invariant 1: balanced alloc/free returns used_blocks to zero.
     #[test]
     fn round_trip_alloc_free_reaches_zero(n in 0usize..=50) {

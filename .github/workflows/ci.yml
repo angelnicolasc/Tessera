@@ -54,21 +54,13 @@ jobs:
         with:
           tool: cargo-nextest
       - name: cargo nextest run
-        # `cargo test` was hanging for 35+ minutes on every matrix variant on this
-        # branch, with no way to see live log output until the job timed out.
-        # nextest fixes both: each test runs in its own process (no shared-state
-        # poisoning between tests in the same binary) and enforces a per-test
-        # `slow-timeout` + hard `kill-timeout` so a hang fails fast with the test
-        # name in the report. tessera-py exclusion: same reason as before
+        # Per-test timeouts come from .config/nextest.toml (slow-timeout +
+        # terminate-after). tessera-py exclusion: same reason as before
         # (extension-module cdylib can't be linked as a normal test binary on
         # macOS/Windows).
         run: cargo nextest run --workspace --exclude tessera-py --no-fail-fast
         env:
           RUST_BACKTRACE: "1"
-          # Fail a test that runs longer than 60 s. Hard-kill after 90 s.
-          NEXTEST_TEST_THREADS: "num-cpus"
-          NEXTEST_SLOW_TIMEOUT: "60"
-          NEXTEST_KILL_TIMEOUT: "90"
       - name: cargo bench --no-run
         run: cargo bench --workspace --exclude tessera-py --no-run
 

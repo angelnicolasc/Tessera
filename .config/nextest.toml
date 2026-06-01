@@ -1,0 +1,11 @@
+# nextest configuration. See https://nexte.st/docs/configuration/
+#
+# slow-timeout: mark a test "slow" after `period`, terminate after `period * terminate-after`.
+# With period=30s and terminate-after=2 a runaway test is killed at 60 s instead of running
+# until the CI matrix-job timeout (the prior round burned a full 60 min on a single hung
+# `cow_fork_is_isolated` proptest invocation before discovery).
+[profile.default]
+slow-timeout = { period = "30s", terminate-after = 2 }
+# Fail fast on hangs while still collecting partial output.
+status-level = "pass"
+final-status-level = "slow"
