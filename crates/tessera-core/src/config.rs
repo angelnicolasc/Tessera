@@ -219,9 +219,14 @@ impl CompressionScheme {
                      See ADR-0020."
                 )
             }
-            Self::MhaFull { num_heads, head_dim } => {
+            Self::MhaFull {
+                num_heads,
+                head_dim,
+            } => {
                 // Both K and V are stored fully.
-                2 * u64::from(num_heads) * u64::from(head_dim) * u64::from(num_layers)
+                2 * u64::from(num_heads)
+                    * u64::from(head_dim)
+                    * u64::from(num_layers)
                     * u64::from(dtype_bytes)
             }
             // V4 variants: dtype_bytes ignored; precision is mixed and encoded in
@@ -274,9 +279,8 @@ impl CompressionScheme {
                 //   head_dim - rope_dim elements in FP8 (1 byte each)
                 //   indexer_head_dim elements in FP4   (0.5 byte each; packed)
                 let bf16 = CkvDtype::Bf16.bytes_for_elements(u64::from(rope_dim));
-                let fp8 = CkvDtype::Fp8E4m3.bytes_for_elements(
-                    u64::from(head_dim).saturating_sub(u64::from(rope_dim)),
-                );
+                let fp8 = CkvDtype::Fp8E4m3
+                    .bytes_for_elements(u64::from(head_dim).saturating_sub(u64::from(rope_dim)));
                 let fp4 = CkvDtype::Fp4E2m1.bytes_for_elements(u64::from(indexer_head_dim));
                 let bytes_per_entry = bf16 + fp8 + fp4;
                 // CSA produces 1 compressed entry per k1 original tokens.
@@ -290,19 +294,19 @@ impl CompressionScheme {
                 ..
             } => {
                 let bf16 = CkvDtype::Bf16.bytes_for_elements(u64::from(rope_dim));
-                let fp8 = CkvDtype::Fp8E4m3.bytes_for_elements(
-                    u64::from(head_dim).saturating_sub(u64::from(rope_dim)),
-                );
+                let fp8 = CkvDtype::Fp8E4m3
+                    .bytes_for_elements(u64::from(head_dim).saturating_sub(u64::from(rope_dim)));
                 (bf16 + fp8) / u64::from(k2.max(1))
             }
-            Self::V4Swa { head_dim, rope_dim, .. } => {
+            Self::V4Swa {
+                head_dim, rope_dim, ..
+            } => {
                 // Uncompressed — each original token contributes one full entry. SWA caps
                 // total stored tokens at `window` per request via the State Cache; this
                 // function gives the per-token cost regardless of window.
                 let bf16 = CkvDtype::Bf16.bytes_for_elements(u64::from(rope_dim));
-                let fp8 = CkvDtype::Fp8E4m3.bytes_for_elements(
-                    u64::from(head_dim).saturating_sub(u64::from(rope_dim)),
-                );
+                let fp8 = CkvDtype::Fp8E4m3
+                    .bytes_for_elements(u64::from(head_dim).saturating_sub(u64::from(rope_dim)));
                 bf16 + fp8
             }
             _ => 0,
@@ -328,7 +332,10 @@ impl CompressionScheme {
 
     /// Whether the variant belongs to the V4 hybrid family.
     pub fn is_v4(self) -> bool {
-        matches!(self, Self::V4Csa { .. } | Self::V4Hca { .. } | Self::V4Swa { .. })
+        matches!(
+            self,
+            Self::V4Csa { .. } | Self::V4Hca { .. } | Self::V4Swa { .. }
+        )
     }
 }
 
@@ -374,9 +381,7 @@ impl MlaBlockConfig {
         device: i32,
     ) -> Result<Self> {
         if num_layers == 0 {
-            return Err(TesseraError::InvalidConfig(
-                "num_layers must be > 0".into(),
-            ));
+            return Err(TesseraError::InvalidConfig("num_layers must be > 0".into()));
         }
         if block_size_tokens == 0 {
             return Err(TesseraError::InvalidConfig(
@@ -401,7 +406,10 @@ impl MlaBlockConfig {
                     )));
                 }
             }
-            CompressionScheme::MhaFull { num_heads, head_dim } => {
+            CompressionScheme::MhaFull {
+                num_heads,
+                head_dim,
+            } => {
                 if num_heads == 0 || head_dim == 0 {
                     return Err(TesseraError::InvalidConfig(
                         "MHA num_heads and head_dim must both be > 0".into(),
@@ -412,10 +420,16 @@ impl MlaBlockConfig {
             CompressionScheme::DsaHierarchical { .. } => {
                 return Err(TesseraError::InvalidConfig(
                     "DsaHierarchical is deprecated (Sprint 5). Migrate to CompressionScheme::\
-                     V4Csa / V4Hca / V4Swa per-layer. See ADR-0020.".into(),
+                     V4Csa / V4Hca / V4Swa per-layer. See ADR-0020."
+                        .into(),
                 ));
             }
-            CompressionScheme::V4Csa { k1, head_dim, rope_dim, .. } => {
+            CompressionScheme::V4Csa {
+                k1,
+                head_dim,
+                rope_dim,
+                ..
+            } => {
                 if k1 == 0 || head_dim == 0 || rope_dim == 0 || rope_dim > head_dim {
                     return Err(TesseraError::InvalidConfig(format!(
                         "V4Csa: k1, head_dim, rope_dim must be > 0 with rope_dim ≤ head_dim \
@@ -429,7 +443,12 @@ impl MlaBlockConfig {
                     )));
                 }
             }
-            CompressionScheme::V4Hca { k2, head_dim, rope_dim, .. } => {
+            CompressionScheme::V4Hca {
+                k2,
+                head_dim,
+                rope_dim,
+                ..
+            } => {
                 if k2 == 0 || head_dim == 0 || rope_dim == 0 || rope_dim > head_dim {
                     return Err(TesseraError::InvalidConfig(format!(
                         "V4Hca: k2, head_dim, rope_dim must be > 0 with rope_dim ≤ head_dim \
@@ -443,7 +462,12 @@ impl MlaBlockConfig {
                     )));
                 }
             }
-            CompressionScheme::V4Swa { window, head_dim, rope_dim, .. } => {
+            CompressionScheme::V4Swa {
+                window,
+                head_dim,
+                rope_dim,
+                ..
+            } => {
                 if window == 0 || head_dim == 0 || rope_dim == 0 || rope_dim > head_dim {
                     return Err(TesseraError::InvalidConfig(format!(
                         "V4Swa: window, head_dim, rope_dim must be > 0 with rope_dim ≤ head_dim \
@@ -483,9 +507,8 @@ impl MlaBlockConfig {
                 "with_per_layer_schemes: schemes vector must be non-empty".into(),
             ));
         }
-        let num_layers = u32::try_from(schemes.len()).map_err(|_| {
-            TesseraError::InvalidConfig("num_layers does not fit in u32".into())
-        })?;
+        let num_layers = u32::try_from(schemes.len())
+            .map_err(|_| TesseraError::InvalidConfig("num_layers does not fit in u32".into()))?;
         // Validate each layer individually using the homogeneous path. We tolerate that
         // `new()` will fail on MLA block_size_tokens != 64; per-layer V4 configs are
         // expected to use V4 variants throughout, so this is the strict path.
@@ -531,8 +554,8 @@ impl MlaBlockConfig {
                 let mut total = 0u64;
                 for scheme in per_layer.iter() {
                     if scheme.is_v4() {
-                        total += scheme.bytes_per_token_per_layer()
-                            * u64::from(self.block_size_tokens);
+                        total +=
+                            scheme.bytes_per_token_per_layer() * u64::from(self.block_size_tokens);
                     } else {
                         // Mixed V4 + non-V4 per-layer maps fall back to the homogeneous
                         // accounting for non-V4 layers.
@@ -557,8 +580,7 @@ impl MlaBlockConfig {
             Some(per_layer) => {
                 let mut total = 0u64;
                 for scheme in per_layer.iter() {
-                    total += scheme.rope_bytes_per_token(1)
-                        * u64::from(self.block_size_tokens);
+                    total += scheme.rope_bytes_per_token(1) * u64::from(self.block_size_tokens);
                 }
                 total
             }
@@ -596,7 +618,10 @@ impl MlaBlockConfig {
     #[allow(deprecated)]
     pub fn compression_ratio_vs_mha_bf16(&self) -> f64 {
         let (num_heads, head_dim) = match self.scheme {
-            CompressionScheme::MhaFull { num_heads, head_dim } => (num_heads, head_dim),
+            CompressionScheme::MhaFull {
+                num_heads,
+                head_dim,
+            } => (num_heads, head_dim),
             // For MLA we cannot know head/head_dim from the scheme alone. The portfolio metric
             // uses DeepSeek-V3 reference (128 heads × 128 dim) — the same constants the
             // playbook uses for its 56.9× headline number.
@@ -605,9 +630,9 @@ impl MlaBlockConfig {
             CompressionScheme::V4Csa { num_heads, .. }
             | CompressionScheme::V4Hca { num_heads, .. }
             | CompressionScheme::V4Swa { num_heads, .. } => (num_heads, 128),
-            CompressionScheme::DsaHierarchical { .. } => unreachable!(
-                "DsaHierarchical configs are rejected by MlaBlockConfig::new"
-            ),
+            CompressionScheme::DsaHierarchical { .. } => {
+                unreachable!("DsaHierarchical configs are rejected by MlaBlockConfig::new")
+            }
         };
         let mha_bytes = 2u64
             * u64::from(num_heads)
@@ -635,7 +660,8 @@ impl MlaBlockConfig {
         }
         const fn lcm(a: u32, b: u32) -> u32 {
             if a == 0 || b == 0 {
-                return a.max(b);
+                // `u32::max` is not a const fn on stable, so compare directly.
+                return if a > b { a } else { b };
             }
             (a / gcd(a, b)).saturating_mul(b)
         }
@@ -681,17 +707,26 @@ mod tests {
     }
 
     fn v4_pro_hca() -> CompressionScheme {
-        CompressionScheme::V4Hca { k2: 128, head_dim: 512, num_heads: 128, rope_dim: 64 }
+        CompressionScheme::V4Hca {
+            k2: 128,
+            head_dim: 512,
+            num_heads: 128,
+            rope_dim: 64,
+        }
     }
 
     fn v4_pro_swa() -> CompressionScheme {
-        CompressionScheme::V4Swa { window: 128, head_dim: 512, num_heads: 128, rope_dim: 64 }
+        CompressionScheme::V4Swa {
+            window: 128,
+            head_dim: 512,
+            num_heads: 128,
+            rope_dim: 64,
+        }
     }
 
     #[test]
     fn deepseek_v3_compression_ratio_is_about_57x() {
-        let cfg =
-            MlaBlockConfig::new(ds_v3_scheme(), 61, 64, CkvDtype::Bf16, 0).unwrap();
+        let cfg = MlaBlockConfig::new(ds_v3_scheme(), 61, 64, CkvDtype::Bf16, 0).unwrap();
         let ratio = cfg.compression_ratio_vs_mha_bf16();
         assert!(
             (55.0..58.0).contains(&ratio),
@@ -731,11 +766,12 @@ mod tests {
 
     #[test]
     fn fp8_halves_primary_bytes() {
-        let bf16_cfg =
-            MlaBlockConfig::new(ds_v3_scheme(), 61, 64, CkvDtype::Bf16, 0).unwrap();
-        let fp8_cfg =
-            MlaBlockConfig::new(ds_v3_scheme(), 61, 64, CkvDtype::Fp8E4m3, 0).unwrap();
-        assert_eq!(bf16_cfg.primary_block_bytes(), 2 * fp8_cfg.primary_block_bytes());
+        let bf16_cfg = MlaBlockConfig::new(ds_v3_scheme(), 61, 64, CkvDtype::Bf16, 0).unwrap();
+        let fp8_cfg = MlaBlockConfig::new(ds_v3_scheme(), 61, 64, CkvDtype::Fp8E4m3, 0).unwrap();
+        assert_eq!(
+            bf16_cfg.primary_block_bytes(),
+            2 * fp8_cfg.primary_block_bytes()
+        );
         assert_eq!(fp8_cfg.fp8_scale_block_bytes(), 61 * 4);
         assert_eq!(bf16_cfg.fp8_scale_block_bytes(), 0);
     }
@@ -767,7 +803,7 @@ mod tests {
     #[test]
     fn v4_csa_passes_validation_with_block_size_multiple_of_k1() {
         let cfg = MlaBlockConfig::new(v4_pro_csa(), 61, 128, CkvDtype::MixedBf16Fp8Fp4, 0).unwrap();
-        assert_eq!(cfg.scheme.is_v4(), true);
+        assert!(cfg.scheme.is_v4());
         assert_eq!(cfg.block_size_tokens, 128);
     }
 
@@ -794,12 +830,14 @@ mod tests {
         layers.push(v4_pro_hca());
         layers.push(v4_pro_hca());
         for i in 0..59 {
-            layers.push(if i % 2 == 0 { v4_pro_csa() } else { v4_pro_hca() });
+            layers.push(if i % 2 == 0 {
+                v4_pro_csa()
+            } else {
+                v4_pro_hca()
+            });
         }
-        let cfg = MlaBlockConfig::with_per_layer_schemes(
-            layers, 128, CkvDtype::MixedBf16Fp8Fp4, 0,
-        )
-        .unwrap();
+        let cfg = MlaBlockConfig::with_per_layer_schemes(layers, 128, CkvDtype::MixedBf16Fp8Fp4, 0)
+            .unwrap();
         assert_eq!(cfg.num_layers, 61);
         assert_eq!(cfg.v4_block_size_lcm(), 128);
         assert!(cfg.has_per_layer_schemes());

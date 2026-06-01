@@ -131,7 +131,13 @@ impl<T: RankTransport> std::fmt::Debug for LatencyInjector<T> {
 
 impl<T: RankTransport> LatencyInjector<T> {
     /// Construct an injector with explicit seed (deterministic). Use this in tests.
-    pub fn new(inner: Arc<T>, profile: LatencyProfile, local: RankId, topology: Topology, seed: u64) -> Self {
+    pub fn new(
+        inner: Arc<T>,
+        profile: LatencyProfile,
+        local: RankId,
+        topology: Topology,
+        seed: u64,
+    ) -> Self {
         Self {
             inner,
             profile,
@@ -143,7 +149,12 @@ impl<T: RankTransport> LatencyInjector<T> {
 
     /// Construct an injector seeded from the OS entropy pool. Use this in production
     /// staging chaos rigs where reproducibility is undesirable.
-    pub fn with_entropy(inner: Arc<T>, profile: LatencyProfile, local: RankId, topology: Topology) -> Self {
+    pub fn with_entropy(
+        inner: Arc<T>,
+        profile: LatencyProfile,
+        local: RankId,
+        topology: Topology,
+    ) -> Self {
         let mut seeder = rand::thread_rng();
         let seed = seeder.next_u64();
         Self::new(inner, profile, local, topology, seed)
@@ -246,39 +257,23 @@ impl<T: RankTransport> RankTransport for LatencyInjector<T> {
             .await
     }
 
-    async fn fetch_block(
-        &self,
-        src: RankId,
-        block_id: BlockId,
-    ) -> anyhow::Result<BlockPayload> {
+    async fn fetch_block(&self, src: RankId, block_id: BlockId) -> anyhow::Result<BlockPayload> {
         self.before(src, "fetch_block").await?;
         self.inner.fetch_block(src, block_id).await
     }
 
-    async fn push_block(
-        &self,
-        dst: RankId,
-        payload: BlockPayload,
-    ) -> anyhow::Result<BlockId> {
+    async fn push_block(&self, dst: RankId, payload: BlockPayload) -> anyhow::Result<BlockId> {
         self.before(dst, "push_block").await?;
         self.inner.push_block(dst, payload).await
     }
 
-    async fn announce_release(
-        &self,
-        src: RankId,
-        block_id: BlockId,
-    ) -> anyhow::Result<()> {
+    async fn announce_release(&self, src: RankId, block_id: BlockId) -> anyhow::Result<()> {
         let any_peer = if src.raw() == 0 { RankId(1) } else { RankId(0) };
         self.before(any_peer, "announce_release").await?;
         self.inner.announce_release(src, block_id).await
     }
 
-    async fn query_hash(
-        &self,
-        dst: RankId,
-        content_hash: u64,
-    ) -> anyhow::Result<Option<BlockId>> {
+    async fn query_hash(&self, dst: RankId, content_hash: u64) -> anyhow::Result<Option<BlockId>> {
         self.before(dst, "query_hash").await?;
         self.inner.query_hash(dst, content_hash).await
     }

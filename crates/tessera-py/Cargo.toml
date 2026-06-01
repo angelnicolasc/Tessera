@@ -32,3 +32,6 @@ pyo3.workspace = true
 numpy.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+# Used by the process-wide TOKIO_RT in lib.rs to drive async Rust APIs from the
+# synchronous Python boundary (see docs/src/adr/0014-multi-rank-architecture.md).
+tokio.workspace = true

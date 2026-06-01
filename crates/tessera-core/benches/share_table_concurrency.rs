@@ -1,5 +1,8 @@
 //! Microbenchmark: cross-agent share-table throughput under multi-threaded add_share.
 
+// criterion's macros expand to undocumented pub items; suppress missing_docs for benches.
+#![allow(missing_docs)]
+
 use std::sync::Arc;
 use std::thread;
 

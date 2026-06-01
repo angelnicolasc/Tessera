@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from tessera.config import TesseraConfig
 
 
-class KernelBackend(str, enum.Enum):
+class KernelBackend(enum.StrEnum):
     """Selectable attention-kernel backends."""
 
     FLASH_MLA = "flash_mla"
@@ -42,7 +42,7 @@ def _has_module(name: str) -> bool:
 def _cuda_capability() -> tuple[int, int] | None:
     """Return ``(major, minor)`` or ``None`` if torch / CUDA is not available."""
     try:
-        import torch  # noqa: PLC0415
+        import torch
     except ImportError:
         return None
     if not torch.cuda.is_available():

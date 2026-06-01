@@ -38,7 +38,11 @@ pub struct NcclTransport {
 
 impl NcclTransport {
     pub fn new(local: RankId, world_size: u32, topology: Topology) -> Self {
-        Self { local, world_size, topology }
+        Self {
+            local,
+            world_size,
+            topology,
+        }
     }
 
     fn deferred<T>(op: &'static str) -> anyhow::Result<T> {
@@ -61,27 +65,15 @@ impl RankTransport for NcclTransport {
         Self::deferred("broadcast_seal")
     }
 
-    async fn fetch_block(
-        &self,
-        _src: RankId,
-        _block_id: BlockId,
-    ) -> anyhow::Result<BlockPayload> {
+    async fn fetch_block(&self, _src: RankId, _block_id: BlockId) -> anyhow::Result<BlockPayload> {
         Self::deferred("fetch_block")
     }
 
-    async fn push_block(
-        &self,
-        _dst: RankId,
-        _payload: BlockPayload,
-    ) -> anyhow::Result<BlockId> {
+    async fn push_block(&self, _dst: RankId, _payload: BlockPayload) -> anyhow::Result<BlockId> {
         Self::deferred("push_block")
     }
 
-    async fn announce_release(
-        &self,
-        _src: RankId,
-        _block_id: BlockId,
-    ) -> anyhow::Result<()> {
+    async fn announce_release(&self, _src: RankId, _block_id: BlockId) -> anyhow::Result<()> {
         Self::deferred("announce_release")
     }
 

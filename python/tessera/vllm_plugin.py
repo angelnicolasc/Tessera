@@ -98,7 +98,9 @@ class TesseraBlockAllocator:
         self._transport = transport  # may be None for singleton
 
         latent_dim = (
-            config.model.latent_dim if config.is_mla else config.model.num_heads * config.model.head_dim
+            config.model.latent_dim
+            if config.is_mla
+            else config.model.num_heads * config.model.head_dim
         )
         self._segment_index = SegmentIndex(
             latent_dim=latent_dim,
@@ -123,7 +125,8 @@ class TesseraBlockAllocator:
 
         self._share_table = CrossAgentShareTable()
         self._fp8_scales: dict[int, float] | None = config.fp8_scales
-        from tessera import observability as _obs  # noqa: PLC0415
+        from tessera import observability as _obs
+
         _obs.init_tracing(config.observability.tracing_endpoint)
 
     @property
@@ -148,19 +151,18 @@ class TesseraBlockAllocator:
 
     # ─────────────── vLLM V1 BlockAllocator protocol ───────────────────────
 
-    def allocate_mutable_block(
-        self, prev_block: Any | None, device: Any
-    ) -> Any:
+    def allocate_mutable_block(self, prev_block: Any | None, device: Any) -> Any:
         """Allocate a fresh writable block.
 
         ``device`` is the torch device handed in by vLLM; ignored by Tessera since the block
         manager owns its own memory budget.
         """
-        from tessera import observability as _obs  # noqa: PLC0415
+        from tessera import observability as _obs
+
         del device
-        req_id      = int(getattr(prev_block, "req_id", 0) or 0)
+        req_id = int(getattr(prev_block, "req_id", 0) or 0)
         token_start = int(getattr(prev_block, "token_end", 0) or 0)
-        block_size  = self._config.block.block_size_tokens
+        block_size = self._config.block.block_size_tokens
         with _obs.span("tessera.allocate"):
             block_id = self._manager.allocate(req_id, token_start, token_start + block_size)
         return _TesseraBlock(
@@ -172,11 +174,10 @@ class TesseraBlockAllocator:
             is_full=False,
         )
 
-    def allocate_immutable_blocks(
-        self, prev_block: Any | None, block_ids: list[int]
-    ) -> list[Any]:
+    def allocate_immutable_blocks(self, prev_block: Any | None, block_ids: list[int]) -> list[Any]:
         """Acquire references to existing immutable (sealed) blocks. Used when vLLM resolves
-        a prefix-cache hit."""
+        a prefix-cache hit.
+        """
         del prev_block
         out: list[Any] = []
         for bid in block_ids:
@@ -200,7 +201,8 @@ class TesseraBlockAllocator:
         ``manager.release_request(req_id)`` which atomically frees all private blocks
         tracked for this request. Shared blocks (via share table) are handled first.
         """
-        from tessera import observability as _obs  # noqa: PLC0415
+        from tessera import observability as _obs
+
         req_id = int(getattr(block, "req_id", 0) or 0)
 
         with _obs.span("tessera.release_request"):
@@ -223,22 +225,23 @@ class TesseraBlockAllocator:
 
     # ─────────────── Tessera-specific hooks ────────────────────────────────
 
-    def post_prefill_seal(
-        self, block_id: int, c_kv: NDArray[np.floating]
-    ) -> int:
+    def post_prefill_seal(self, block_id: int, c_kv: NDArray[np.floating]) -> int:
         """Called by Tessera-aware wrappers after prefill writes ``c_kv`` for a block.
 
         Returns the canonical block id (may differ from ``block_id`` if the seal hit an
         existing duplicate). The HNSW add is scheduled off the hot path.
         """
-        from tessera import observability as _obs  # noqa: PLC0415
+        from tessera import observability as _obs
+
         with _obs.span("tessera.seal"):
             canonical_id, content_hash, was_dedup = self._manager.seal(block_id)
         self._write_fp8_scales(canonical_id)
         if not was_dedup:
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(self._async_hnsw_add(canonical_id, content_hash, c_kv))
+                loop.create_task(  # noqa: RUF006  fire-and-forget HNSW indexing
+                    self._async_hnsw_add(canonical_id, content_hash, c_kv)
+                )
             except RuntimeError:
                 # No running loop (synchronous context, e.g. unit test) — index immediately.
                 self._segment_index.add(canonical_id, content_hash, c_kv)
@@ -255,7 +258,7 @@ class TesseraBlockAllocator:
         ptr = self._manager.fp8_scales_ptr(block_id)
         if ptr is None:
             return
-        import numpy as np  # noqa: PLC0415
+        import numpy as np
 
         num_layers = self._config.model.num_layers
         scales = np.array(
@@ -292,7 +295,8 @@ class TesseraBlockAllocator:
         Returns one entry per input block: an ``int`` for a local hit, a ``(rank, block)``
         tuple for a remote hit, or ``None`` for misses.
         """
-        from tessera import observability as _obs  # noqa: PLC0415
+        from tessera import observability as _obs
+
         results: list[int | tuple[int, int] | None] = []
         hnsw_miss_tasks: list[Any] = []
 
@@ -321,9 +325,7 @@ class TesseraBlockAllocator:
                     # Local Layer 2: schedule async HNSW lookup for future requests.
                     try:
                         loop = asyncio.get_running_loop()
-                        task = loop.create_task(
-                            self._async_hnsw_lookup(c_kv)
-                        )
+                        task = loop.create_task(self._async_hnsw_lookup(c_kv))
                         hnsw_miss_tasks.append(task)
                     except RuntimeError:
                         # No running event loop — synchronous context (e.g. tests).
@@ -335,7 +337,8 @@ class TesseraBlockAllocator:
 
     async def _async_hnsw_lookup(self, c_kv: NDArray[np.floating]) -> None:
         """Background HNSW lookup. Result is discarded if below threshold; otherwise
-        the calling future requests benefit from a populated approximate index."""
+        the calling future requests benefit from a populated approximate index.
+        """
         await self._segment_index.lookup_approximate(c_kv)
 
 
@@ -364,12 +367,12 @@ class _TesseraBlock:
         is_shared: bool = False,
     ) -> None:
         self._allocator = allocator
-        self.block_id   = block_id
-        self.req_id     = req_id
+        self.block_id = block_id
+        self.req_id = req_id
         self.token_start = token_start
-        self.token_end   = token_end
-        self.is_full     = is_full
-        self.is_shared   = is_shared
+        self.token_end = token_end
+        self.is_full = is_full
+        self.is_shared = is_shared
 
     def __repr__(self) -> str:
         return (

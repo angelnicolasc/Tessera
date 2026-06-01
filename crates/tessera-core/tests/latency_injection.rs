@@ -19,7 +19,11 @@ use tessera_core::transport::{
 struct EchoPeer;
 impl MockPeer for EchoPeer {
     fn provide_block(&self, _: BlockId) -> anyhow::Result<BlockPayload> {
-        Ok(BlockPayload { c_kv: vec![], k_rope: vec![], fp8_scales: None })
+        Ok(BlockPayload {
+            c_kv: vec![],
+            k_rope: vec![],
+            fp8_scales: None,
+        })
     }
     fn accept_pushed(&self, _: BlockPayload) -> anyhow::Result<BlockId> {
         Ok(BlockId(0))
@@ -32,7 +36,11 @@ impl MockPeer for EchoPeer {
     }
 }
 
-fn wrap_mock(profile: LatencyProfile, topology: Topology, seed: u64) -> LatencyInjector<MockTransport> {
+fn wrap_mock(
+    profile: LatencyProfile,
+    topology: Topology,
+    seed: u64,
+) -> LatencyInjector<MockTransport> {
     let handles = MockTransport::new_world(2);
     handles[0].register_peer(RankId(1), Arc::new(EchoPeer));
     let inner = Arc::new(handles[0].clone());
@@ -93,7 +101,10 @@ async fn multi_node_topology_picks_cross_node_tier() {
 #[tokio::test]
 async fn drop_rate_one_point_zero_always_fails() {
     let injector = wrap_mock(LatencyProfile::ALL_DROPS, Topology::SingleNode, 1);
-    let err = injector.fetch_block(RankId(1), BlockId(0)).await.unwrap_err();
+    let err = injector
+        .fetch_block(RankId(1), BlockId(0))
+        .await
+        .unwrap_err();
     assert!(
         format!("{err}").contains("simulated drop"),
         "expected simulated drop error, got: {err}"
@@ -127,7 +138,10 @@ async fn deterministic_with_explicit_seed() {
         seq_a.push(inj_a.query_hash(RankId(1), 0).await.is_err());
         seq_b.push(inj_b.query_hash(RankId(1), 0).await.is_err());
     }
-    assert_eq!(seq_a, seq_b, "same seed must produce identical drop sequences");
+    assert_eq!(
+        seq_a, seq_b,
+        "same seed must produce identical drop sequences"
+    );
 }
 
 #[tokio::test]

@@ -117,7 +117,10 @@ impl PyCompressionScheme {
     #[staticmethod]
     fn mha_full(num_heads: u32, head_dim: u32) -> Self {
         Self {
-            inner: CompressionScheme::MhaFull { num_heads, head_dim },
+            inner: CompressionScheme::MhaFull {
+                num_heads,
+                head_dim,
+            },
         }
     }
 
@@ -174,7 +177,12 @@ impl PyCompressionScheme {
     #[staticmethod]
     fn v4_hca(k2: u32, head_dim: u32, num_heads: u32, rope_dim: u32) -> Self {
         Self {
-            inner: CompressionScheme::V4Hca { k2, head_dim, num_heads, rope_dim },
+            inner: CompressionScheme::V4Hca {
+                k2,
+                head_dim,
+                num_heads,
+                rope_dim,
+            },
         }
     }
 
@@ -182,7 +190,12 @@ impl PyCompressionScheme {
     #[staticmethod]
     fn v4_swa(window: u32, head_dim: u32, num_heads: u32, rope_dim: u32) -> Self {
         Self {
-            inner: CompressionScheme::V4Swa { window, head_dim, num_heads, rope_dim },
+            inner: CompressionScheme::V4Swa {
+                window,
+                head_dim,
+                num_heads,
+                rope_dim,
+            },
         }
     }
 
@@ -274,7 +287,9 @@ impl PyMlaBlockConfig {
     /// **Sprint 5 / V4** — Per-layer scheme resolution. Returns the scheme for the given
     /// layer index. For homogeneous configs returns the primary scheme.
     fn scheme_for_layer(&self, layer_idx: u32) -> PyCompressionScheme {
-        PyCompressionScheme { inner: self.inner.scheme_for_layer(layer_idx) }
+        PyCompressionScheme {
+            inner: self.inner.scheme_for_layer(layer_idx),
+        }
     }
 
     /// Whether this config carries an explicit per-layer schemes vector.
@@ -330,7 +345,9 @@ impl PyBlockManager {
     #[new]
     fn new(config: PyMlaBlockConfig, memory_bytes: u64) -> PyResult<Self> {
         let inner = TesseraBlockManager::new(config.inner, memory_bytes).map_err(map_err)?;
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 
     /// Multi-rank constructor. `world` is a [`PyWorld`] describing the surrounding
@@ -350,7 +367,9 @@ impl PyBlockManager {
             world.inner.clone(),
         )
         .map_err(map_err)?;
-        Ok(Self { inner: Arc::new(inner) })
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
     }
 
     fn allocate(&self, req_id: u64, token_start: u32, token_end: u32) -> PyResult<u32> {
@@ -481,7 +500,9 @@ pub struct PyShareTable {
 impl PyShareTable {
     #[new]
     fn new() -> Self {
-        Self { inner: CrossAgentShareTable::new() }
+        Self {
+            inner: CrossAgentShareTable::new(),
+        }
     }
 
     fn add_share(&self, req_id: u64, block_id: u32) {
@@ -489,7 +510,11 @@ impl PyShareTable {
     }
 
     fn release_request(&self, req_id: u64) -> Vec<u32> {
-        self.inner.release_request(req_id).into_iter().map(BlockId::raw).collect()
+        self.inner
+            .release_request(req_id)
+            .into_iter()
+            .map(BlockId::raw)
+            .collect()
     }
 
     fn owners(&self, block_id: u32) -> Option<Vec<u64>> {
@@ -546,18 +571,21 @@ impl PyUsearchIndex {
     }
 
     fn add(&self, block_id: u32, descriptor: PyReadonlyArray1<'_, f32>) -> PyResult<()> {
-        let slice = descriptor.as_slice().map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        let slice = descriptor
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         self.inner.add(block_id, slice).map_err(map_anyhow)
     }
 
-    fn query(
-        &self,
-        descriptor: PyReadonlyArray1<'_, f32>,
-        k: usize,
-    ) -> PyResult<Vec<(u32, f32)>> {
-        let slice = descriptor.as_slice().map_err(|e| PyValueError::new_err(format!("{e}")))?;
+    fn query(&self, descriptor: PyReadonlyArray1<'_, f32>, k: usize) -> PyResult<Vec<(u32, f32)>> {
+        let slice = descriptor
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         let matches = self.inner.query(slice, k).map_err(map_anyhow)?;
-        Ok(matches.into_iter().map(|m| (m.block_id, m.similarity)).collect())
+        Ok(matches
+            .into_iter()
+            .map(|m| (m.block_id, m.similarity))
+            .collect())
     }
 
     fn remove(&self, block_id: u32) -> PyResult<()> {
@@ -637,7 +665,9 @@ impl PyWorld {
     /// Convenience: world of size 1, rank 0. Equivalent to `World::singleton()` in Rust.
     #[staticmethod]
     fn singleton() -> Self {
-        Self { inner: Arc::new(World::singleton()) }
+        Self {
+            inner: Arc::new(World::singleton()),
+        }
     }
 
     /// Multi-node world (NCCL territory; Sprint 4 runtime impl). `node_of[i]` is the
@@ -645,8 +675,10 @@ impl PyWorld {
     #[staticmethod]
     fn multi_node(local: u32, size: u32, node_of: Vec<u32>) -> PyResult<Self> {
         let node_of: Vec<NodeId> = node_of.into_iter().map(NodeId).collect();
-        let w = World::new(RankId(local), size, Topology::MultiNode { node_of })
-            .ok_or_else(|| PyValueError::new_err("invalid (local, size, node_of) for World::multi_node"))?;
+        let w =
+            World::new(RankId(local), size, Topology::MultiNode { node_of }).ok_or_else(|| {
+                PyValueError::new_err("invalid (local, size, node_of) for World::multi_node")
+            })?;
         Ok(Self { inner: Arc::new(w) })
     }
 
@@ -677,7 +709,11 @@ impl PyWorld {
             "World(local=r{}, size={}, topology={})",
             self.inner.local.raw(),
             self.inner.size,
-            if self.inner.topology.is_multi_node() { "MultiNode" } else { "SingleNode" }
+            if self.inner.topology.is_multi_node() {
+                "MultiNode"
+            } else {
+                "SingleNode"
+            }
         )
     }
 }
@@ -761,7 +797,10 @@ impl PyMockTransport {
             .into_iter()
             .map(|m| {
                 let arc: Arc<dyn RankTransport> = Arc::new(m.clone());
-                Self { inner: arc, mock: m }
+                Self {
+                    inner: arc,
+                    mock: m,
+                }
             })
             .collect()
     }
@@ -771,7 +810,10 @@ impl PyMockTransport {
     fn singleton() -> Self {
         let m = MockTransport::singleton();
         let arc: Arc<dyn RankTransport> = Arc::new(m.clone());
-        Self { inner: arc, mock: m }
+        Self {
+            inner: arc,
+            mock: m,
+        }
     }
 
     /// Wire a `BlockManager` as the peer answering for `rank` on this transport handle. The
@@ -779,12 +821,7 @@ impl PyMockTransport {
     /// via `push_block`. The destination's token range is currently fixed at `[0, 64)` for
     /// Sprint 3; this matches FlashMLA's block size and is sufficient for the multirank
     /// tests.
-    fn register_block_manager_peer(
-        &self,
-        rank: u32,
-        manager: &PyBlockManager,
-        accept_req_id: u64,
-    ) {
+    fn register_block_manager_peer(&self, rank: u32, manager: &PyBlockManager, accept_req_id: u64) {
         let adapter = BlockManagerPeerAdapter {
             manager: Arc::clone(&manager.inner),
             accept_req_id,
@@ -866,7 +903,7 @@ impl PyDistributedSegmentIndex {
     /// Look up a content hash. Returns `(rank, block_id)` if any peer holds the hash,
     /// otherwise `None`. Always safe to call; a miss simply means the caller computes the
     /// block fresh.
-    fn lookup_hash<'py>(&self, py: Python<'py>, content_hash: u64) -> PyResult<Option<(u32, u32)>> {
+    fn lookup_hash(&self, py: Python<'_>, content_hash: u64) -> PyResult<Option<(u32, u32)>> {
         py.allow_threads(|| {
             TOKIO_RT
                 .block_on(self.inner.lookup_hash(content_hash))
@@ -907,6 +944,9 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistributedSegmentIndex>()?;
     m.add_function(wrap_pyfunction!(metrics_snapshot_text, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("REQUIRED_BLOCK_SIZE_TOKENS", tessera_core::config::REQUIRED_BLOCK_SIZE_TOKENS)?;
+    m.add(
+        "REQUIRED_BLOCK_SIZE_TOKENS",
+        tessera_core::config::REQUIRED_BLOCK_SIZE_TOKENS,
+    )?;
     Ok(())
 }

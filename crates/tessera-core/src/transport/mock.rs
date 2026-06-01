@@ -124,7 +124,11 @@ pub trait MockPeer: Send + Sync {
 pub struct NullPeer;
 impl MockPeer for NullPeer {
     fn provide_block(&self, _block_id: BlockId) -> anyhow::Result<BlockPayload> {
-        Ok(BlockPayload { c_kv: vec![], k_rope: vec![], fp8_scales: None })
+        Ok(BlockPayload {
+            c_kv: vec![],
+            k_rope: vec![],
+            fp8_scales: None,
+        })
     }
     fn accept_pushed(&self, _payload: BlockPayload) -> anyhow::Result<BlockId> {
         Ok(BlockId(0))
@@ -267,7 +271,11 @@ impl RankTransport for MockTransport {
         content_hash: u64,
         descriptor: Vec<f32>,
     ) -> anyhow::Result<()> {
-        self.record(MockEvent::BroadcastSeal { src, block_id, content_hash });
+        self.record(MockEvent::BroadcastSeal {
+            src,
+            block_id,
+            content_hash,
+        });
         // Fan out to every peer (excluding source).
         let mut peers: Vec<(RankId, Arc<dyn MockPeer>)> = Vec::new();
         {
@@ -290,11 +298,7 @@ impl RankTransport for MockTransport {
         Ok(())
     }
 
-    async fn fetch_block(
-        &self,
-        src: RankId,
-        block_id: BlockId,
-    ) -> anyhow::Result<BlockPayload> {
+    async fn fetch_block(&self, src: RankId, block_id: BlockId) -> anyhow::Result<BlockPayload> {
         self.record(MockEvent::Fetch { src, block_id });
         let peer = self
             .peer(src)
@@ -307,11 +311,7 @@ impl RankTransport for MockTransport {
         Ok(payload)
     }
 
-    async fn push_block(
-        &self,
-        dst: RankId,
-        payload: BlockPayload,
-    ) -> anyhow::Result<BlockId> {
+    async fn push_block(&self, dst: RankId, payload: BlockPayload) -> anyhow::Result<BlockId> {
         let bytes = payload.byte_len();
         self.record(MockEvent::Push { dst, bytes });
         let peer = self
@@ -325,11 +325,7 @@ impl RankTransport for MockTransport {
         Ok(assigned)
     }
 
-    async fn announce_release(
-        &self,
-        src: RankId,
-        block_id: BlockId,
-    ) -> anyhow::Result<()> {
+    async fn announce_release(&self, src: RankId, block_id: BlockId) -> anyhow::Result<()> {
         self.record(MockEvent::Release { src, block_id });
         let peers: Vec<(RankId, Arc<dyn MockPeer>)> = {
             let reg = self.registry.lock();
@@ -348,11 +344,7 @@ impl RankTransport for MockTransport {
         Ok(())
     }
 
-    async fn query_hash(
-        &self,
-        dst: RankId,
-        content_hash: u64,
-    ) -> anyhow::Result<Option<BlockId>> {
+    async fn query_hash(&self, dst: RankId, content_hash: u64) -> anyhow::Result<Option<BlockId>> {
         self.record(MockEvent::QueryHash { dst, content_hash });
         let peer = self
             .peer(dst)
@@ -398,7 +390,11 @@ impl RankTransport for MockTransport {
             .ok_or_else(|| anyhow::anyhow!("MockTransport: no peer registered for rank {dst}"))?;
         peer.release_reservation(token)?;
         crate::metrics::CROSS_RANK_TRANSFERS_TOTAL
-            .with_label_values(&[&self.local.to_string(), &dst.to_string(), "release_reservation"])
+            .with_label_values(&[
+                &self.local.to_string(),
+                &dst.to_string(),
+                "release_reservation",
+            ])
             .inc();
         tokio::task::yield_now().await;
         Ok(())

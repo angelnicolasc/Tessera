@@ -39,7 +39,10 @@ fn rejects_wrong_block_size_under_mla() {
 #[test]
 fn allows_mha_fallback() {
     let cfg = MlaBlockConfig::new(
-        CompressionScheme::MhaFull { num_heads: 32, head_dim: 128 },
+        CompressionScheme::MhaFull {
+            num_heads: 32,
+            head_dim: 128,
+        },
         24,
         16,
         CkvDtype::Bf16,
@@ -95,7 +98,12 @@ fn accepts_v4_csa_with_block_size_multiple_of_k1() {
 fn accepts_v4_hybrid_per_layer_schemes() {
     use tessera_core::CompressionScheme as C;
     let layers = vec![
-        C::V4Hca { k2: 128, head_dim: 512, num_heads: 128, rope_dim: 64 },
+        C::V4Hca {
+            k2: 128,
+            head_dim: 512,
+            num_heads: 128,
+            rope_dim: 64,
+        },
         C::V4Csa {
             k1: 4,
             head_dim: 512,
@@ -106,9 +114,8 @@ fn accepts_v4_hybrid_per_layer_schemes() {
             top_k: 1024,
         },
     ];
-    let cfg =
-        MlaBlockConfig::with_per_layer_schemes(layers, 128, CkvDtype::MixedBf16Fp8Fp4, 0)
-            .expect("V4 per-layer hybrid config must validate");
+    let cfg = MlaBlockConfig::with_per_layer_schemes(layers, 128, CkvDtype::MixedBf16Fp8Fp4, 0)
+        .expect("V4 per-layer hybrid config must validate");
     assert!(cfg.has_per_layer_schemes());
     assert_eq!(cfg.num_layers, 2);
     assert_eq!(cfg.v4_block_size_lcm(), 128);

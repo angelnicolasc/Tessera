@@ -7,10 +7,7 @@ No GPU required — runs entirely on the CPU mock backend.
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
-import pytest
 
 from tessera import _native
 

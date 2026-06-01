@@ -78,7 +78,8 @@ def hash_ckv_bytes(c_kv: NDArray[np.floating]) -> int:
 def descriptor_from_ckv(c_kv: NDArray[np.floating]) -> NDArray[np.float32]:
     """Compute the per-block ANN descriptor: mean over (layer, token) reduces ``c_kv`` to
     a ``[d_c]`` vector. This is the only place MLA's storage shape leaks into the index
-    pipeline; DSA will replace this function, not the trait."""
+    pipeline; DSA will replace this function, not the trait.
+    """
     if c_kv.ndim != 3:  # [num_layers, block_size_tokens, d_c]
         msg = f"expected c_kv with shape [L, T, d_c]; got ndim={c_kv.ndim}"
         raise ValueError(msg)
@@ -88,8 +89,10 @@ def descriptor_from_ckv(c_kv: NDArray[np.floating]) -> NDArray[np.float32]:
 class SegmentIndex:
     """Two-layer content-addressed segment index over MLA ``c_kv`` blocks."""
 
-    DEFAULT_LATENCY_BUDGET_US: int = 500
-    """Default async HNSW lookup budget. Miss-on-timeout is safe."""
+    DEFAULT_LATENCY_BUDGET_US: int = 50_000
+    """Default async HNSW lookup budget (50 ms). Miss-on-timeout is safe; the previous
+    500 μs default was below the floor of `asyncio.timeout` + thread-executor dispatch
+    + usearch search even on idle machines, so it always timed out into a false miss."""
 
     def __init__(
         self,
@@ -119,8 +122,8 @@ class SegmentIndex:
         """
         self._latent_dim = latent_dim
         self._num_layers = num_layers
-        self._threshold  = similarity_threshold
-        self._budget_s   = latency_budget_us / 1_000_000.0
+        self._threshold = similarity_threshold
+        self._budget_s = latency_budget_us / 1_000_000.0
 
         self._exact: dict[int, int] = {}
 
@@ -128,7 +131,7 @@ class SegmentIndex:
         self._sem = asyncio.Semaphore(max_concurrent_queries)
 
         if backend is None:
-            from tessera import _native  # noqa: PLC0415
+            from tessera import _native
 
             backend = _native.UsearchIndex(
                 latent_dim,
@@ -146,20 +149,18 @@ class SegmentIndex:
 
     # ─────────────────── Layer 2: HNSW approximate (async) ───────────────────
 
-    async def lookup_approximate(
-        self, c_kv: NDArray[np.floating]
-    ) -> SegmentMatch | None:
+    async def lookup_approximate(self, c_kv: NDArray[np.floating]) -> SegmentMatch | None:
         """HNSW lookup with the configured latency budget and backpressure cap.
 
         Returns ``None`` if no match clears ``similarity_threshold``, the budget is
         exceeded, or the semaphore cannot be acquired within the budget window.
         Either case is a safe miss — the caller falls back to computing fresh.
         """
-        from tessera import observability  # noqa: PLC0415
+        from tessera import observability
 
         descriptor = descriptor_from_ckv(c_kv)
-        executor   = _get_executor()
-        loop       = asyncio.get_running_loop()
+        executor = _get_executor()
+        loop = asyncio.get_running_loop()
 
         observability.set_segment_index_queue_depth(
             self._sem._value  # type: ignore[attr-defined]  # asyncio internals
@@ -172,12 +173,13 @@ class SegmentIndex:
                         matches: list[tuple[int, float]] = await loop.run_in_executor(
                             executor, self._backend.query, descriptor, 1
                         )
-        except (asyncio.TimeoutError, TimeoutError):
+        except TimeoutError:
             try:
-                from tessera import observability as _obs  # noqa: PLC0415
+                from tessera import observability as _obs
+
                 _obs.hnsw_budget_exceeded()
-            except Exception:  # pragma: no cover - metric path is best-effort
-                pass
+            except Exception:  # noqa: S110  metric path is intentionally best-effort
+                pass  # pragma: no cover
             return None
         finally:
             # Always update queue depth after the query completes/times out.
@@ -194,9 +196,7 @@ class SegmentIndex:
 
     # ─────────────────── mutators ─────────────────────────────────────────────
 
-    def add(
-        self, block_id: int, content_hash: int, c_kv: NDArray[np.floating]
-    ) -> None:
+    def add(self, block_id: int, content_hash: int, c_kv: NDArray[np.floating]) -> None:
         """Register a newly sealed block in both layers."""
         self._exact[content_hash] = block_id
         descriptor = descriptor_from_ckv(c_kv)

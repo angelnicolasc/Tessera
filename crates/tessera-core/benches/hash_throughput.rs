@@ -1,6 +1,10 @@
 //! Microbenchmark: xxhash3 throughput across representative block sizes. The headline number
 //! to watch is GB/s; on modern x86-64 we expect >10 GB/s on a single core.
 
+// criterion's `criterion_group!` / `criterion_main!` macros expand to undocumented
+// `pub fn` items; suppress the workspace-level missing_docs lint for this bench.
+#![allow(missing_docs)]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use tessera_core::content_hash::{ContentHasher, Xxh3Hasher};
 

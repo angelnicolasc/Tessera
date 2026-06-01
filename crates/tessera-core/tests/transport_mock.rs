@@ -66,7 +66,9 @@ impl MockPeer for CapturePeer {
         content_hash: u64,
         _descriptor: &[f32],
     ) -> anyhow::Result<()> {
-        self.seals_received.lock().push((src, block_id, content_hash));
+        self.seals_received
+            .lock()
+            .push((src, block_id, content_hash));
         Ok(())
     }
 }
@@ -87,8 +89,8 @@ async fn broadcast_seal_reaches_all_peers_except_source() {
     // Source did NOT receive its own broadcast.
     assert!(peers[0].seals_received.lock().is_empty());
     // Every other peer got it exactly once.
-    for i in 1..4 {
-        let received = peers[i].seals_received.lock();
+    for (i, peer) in peers.iter().enumerate().take(4).skip(1) {
+        let received = peer.seals_received.lock();
         assert_eq!(received.len(), 1, "rank {i} missed the broadcast");
         assert_eq!(received[0], (RankId(0), BlockId(7), 0xCAFE));
     }
@@ -114,7 +116,10 @@ async fn fetch_block_returns_payload_from_owner_peer() {
     peer1.put(BlockId(42), payload.clone(), 0xDEAD);
     handles[0].register_peer(RankId(1), Arc::clone(&peer1) as Arc<dyn MockPeer>);
 
-    let fetched = handles[0].fetch_block(RankId(1), BlockId(42)).await.unwrap();
+    let fetched = handles[0]
+        .fetch_block(RankId(1), BlockId(42))
+        .await
+        .unwrap();
     assert_eq!(fetched.c_kv, payload.c_kv);
     assert_eq!(fetched.k_rope, payload.k_rope);
     assert!(fetched.fp8_scales.is_none());
@@ -145,7 +150,11 @@ async fn query_hash_returns_local_block_id_when_present() {
     let peer1 = CapturePeer::new();
     peer1.put(
         BlockId(11),
-        BlockPayload { c_kv: vec![], k_rope: vec![], fp8_scales: None },
+        BlockPayload {
+            c_kv: vec![],
+            k_rope: vec![],
+            fp8_scales: None,
+        },
         0xFEED,
     );
     handles[0].register_peer(RankId(1), Arc::clone(&peer1) as Arc<dyn MockPeer>);

@@ -33,12 +33,7 @@ pub trait ContentHasher: Send + Sync {
     /// Override this method with an on-device kernel (e.g. `CudaXxh3Hasher`) to eliminate
     /// the transfer entirely. The seam exists so no caller changes are required when the
     /// override lands. See ADR-0008 and TD-002.
-    fn hash_device(
-        &self,
-        backend: &dyn DeviceBackend,
-        ptr: DevicePtr,
-        len: usize,
-    ) -> Result<u64> {
+    fn hash_device(&self, backend: &dyn DeviceBackend, ptr: DevicePtr, len: usize) -> Result<u64> {
         let bytes = backend.read_bytes(ptr, len)?;
         Ok(self.hash(&bytes))
     }

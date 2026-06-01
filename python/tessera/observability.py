@@ -36,12 +36,16 @@ def init_tracing(endpoint: str, service_name: str = "tessera") -> None:
     if not endpoint:
         return
     try:
-        from opentelemetry import trace  # type: ignore[import-not-found]  # noqa: PLC0415
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-not-found]  # noqa: PLC0415
+        from opentelemetry import trace  # type: ignore[import-not-found]
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-not-found]
             OTLPSpanExporter,
         )
-        from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]  # noqa: PLC0415
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-not-found]  # noqa: PLC0415
+        from opentelemetry.sdk.trace import (
+            TracerProvider,  # type: ignore[import-not-found]
+        )
+        from opentelemetry.sdk.trace.export import (
+            BatchSpanProcessor,  # type: ignore[import-not-found]
+        )
     except ImportError:
         return
     provider = TracerProvider()

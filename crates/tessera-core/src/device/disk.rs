@@ -35,7 +35,10 @@ pub enum SwaCachingStrategy {
     Full,
     /// Snapshot SWA every `checkpoint_interval_tokens` tokens (default 4096). On hit, load
     /// nearest checkpoint and recompute the tail.
-    Periodic { checkpoint_interval_tokens: u32 },
+    Periodic {
+        /// Number of tokens between persisted SWA snapshots.
+        checkpoint_interval_tokens: u32,
+    },
     /// Persist nothing for SWA. On hit, reconstruct SWA from cached CSA/HCA + recompute
     /// the last `win × L` tokens. Storage-cheap, compute-heavy.
     Zero,
@@ -43,7 +46,9 @@ pub enum SwaCachingStrategy {
 
 impl Default for SwaCachingStrategy {
     fn default() -> Self {
-        Self::Periodic { checkpoint_interval_tokens: 4096 }
+        Self::Periodic {
+            checkpoint_interval_tokens: 4096,
+        }
     }
 }
 
@@ -138,9 +143,9 @@ impl DiskBackend {
     pub fn should_persist_swa(&self, token_pos: u32) -> bool {
         match self.inner.lock().strategy {
             SwaCachingStrategy::Full => true,
-            SwaCachingStrategy::Periodic { checkpoint_interval_tokens } => {
-                checkpoint_interval_tokens > 0 && token_pos % checkpoint_interval_tokens == 0
-            }
+            SwaCachingStrategy::Periodic {
+                checkpoint_interval_tokens,
+            } => checkpoint_interval_tokens > 0 && token_pos % checkpoint_interval_tokens == 0,
             SwaCachingStrategy::Zero => false,
         }
     }
@@ -162,7 +167,9 @@ impl DeviceBackend for DiskBackend {
         let size = usize::try_from(bytes).context("region size overflows usize")?;
         let mut inner = self.inner.lock();
         let idx = inner.regions.len();
-        let path = inner.root.join(format!("region-{idx:04}-{}.bin", kind.as_str()));
+        let path = inner
+            .root
+            .join(format!("region-{idx:04}-{}.bin", kind.as_str()));
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -182,7 +189,12 @@ impl DeviceBackend for DiskBackend {
             }
         }
         let raw = buffer.as_ptr() as usize;
-        let region = Region { file, buffer, dirty: false, kind };
+        let region = Region {
+            file,
+            buffer,
+            dirty: false,
+            kind,
+        };
         inner.regions.push(region);
         tracing::debug!(
             ?kind,
@@ -329,7 +341,10 @@ mod tests {
         assert_eq!(SwaCachingStrategy::Full.as_str(), "full");
         assert_eq!(SwaCachingStrategy::Zero.as_str(), "zero");
         assert_eq!(
-            SwaCachingStrategy::Periodic { checkpoint_interval_tokens: 1 }.as_str(),
+            SwaCachingStrategy::Periodic {
+                checkpoint_interval_tokens: 1
+            }
+            .as_str(),
             "periodic"
         );
     }

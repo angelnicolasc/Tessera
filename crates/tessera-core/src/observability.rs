@@ -58,7 +58,11 @@ pub fn init_otlp_tracing(endpoint: &str, service_name: &str) -> anyhow::Result<(
     // Stash the provider so the batch exporter keeps draining on shutdown.
     opentelemetry::global::set_tracer_provider(provider);
 
-    tracing::info!(endpoint, service_name, "tessera OTLP tracing bridge initialised");
+    tracing::info!(
+        endpoint,
+        service_name,
+        "tessera OTLP tracing bridge initialised"
+    );
     Ok(())
 }
 
@@ -76,6 +80,7 @@ pub fn shutdown_tracing() {
     opentelemetry::global::shutdown_tracer_provider();
 }
 
+/// No-op tracing shutdown when the `otel-rust` feature is disabled.
 #[cfg(not(feature = "otel-rust"))]
 pub fn shutdown_tracing() {}
 

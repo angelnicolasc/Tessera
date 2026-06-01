@@ -32,8 +32,16 @@ mod cuda_hash_tests {
             }
         }
         let h = StubHasher;
-        assert_eq!(h.hash(&payload), h.hash(&payload), "stub hash must be deterministic");
-        assert_ne!(h.hash(&payload), 0, "stub hash must be non-zero for non-trivial input");
+        assert_eq!(
+            h.hash(&payload),
+            h.hash(&payload),
+            "stub hash must be deterministic"
+        );
+        assert_ne!(
+            h.hash(&payload),
+            0,
+            "stub hash must be non-zero for non-trivial input"
+        );
     }
 
     /// Verifies the stub hash varies with input (not a trivially-constant function).
@@ -63,11 +71,17 @@ mod cuda_hash_tests {
 
         // Allocate a small region, fill with pattern, hash it.
         use tessera_core::device::{DeviceBackend, RegionKind};
-        let ptr = backend.alloc_region(128, RegionKind::Primary).expect("alloc");
+        let ptr = backend
+            .alloc_region(128, RegionKind::Primary)
+            .expect("alloc");
         backend.fill_pattern(ptr, 0xAB, 128).expect("fill");
 
-        let h1 = hasher.hash_device(&*backend, ptr, 128).expect("hash_device must not fail");
-        let h2 = hasher.hash_device(&*backend, ptr, 128).expect("hash_device idempotent");
+        let h1 = hasher
+            .hash_device(&*backend, ptr, 128)
+            .expect("hash_device must not fail");
+        let h2 = hasher
+            .hash_device(&*backend, ptr, 128)
+            .expect("hash_device idempotent");
         assert_eq!(h1, h2, "hash_device must be deterministic");
         assert_ne!(h1, 0, "hash_device must be non-zero for 0xAB-filled region");
         assert_eq!(hasher.name(), "cuda-xxh3-stub");

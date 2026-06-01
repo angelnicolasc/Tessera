@@ -11,7 +11,10 @@ use tessera_core::{CkvDtype, CompressionScheme, MlaBlockConfig, TesseraBlockMana
 
 fn small_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 32, rope_key_dim: 8 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 32,
+            rope_key_dim: 8,
+        },
         4,
         64,
         CkvDtype::Bf16,
@@ -22,7 +25,8 @@ fn small_cfg() -> MlaBlockConfig {
 
 fn make_manager(n_blocks: u32) -> TesseraBlockManager {
     let cfg = small_cfg();
-    TesseraBlockManager::new(cfg, u64::from(n_blocks) * cfg.total_block_bytes()).unwrap()
+    let budget = u64::from(n_blocks) * cfg.total_block_bytes();
+    TesseraBlockManager::new(cfg, budget).unwrap()
 }
 
 /// 50 threads each perform an alloc → release_request cycle concurrently. After all threads
@@ -43,7 +47,9 @@ fn concurrent_alloc_release_no_leak() {
                 let mut block_ids = Vec::with_capacity(BLOCKS_PER_THREAD as usize);
                 for i in 0..BLOCKS_PER_THREAD {
                     let start = token_base + i * 64;
-                    let bid = mgr.allocate(req_id, TokenRange::new(start, start + 64)).unwrap();
+                    let bid = mgr
+                        .allocate(req_id, TokenRange::new(start, start + 64))
+                        .unwrap();
                     block_ids.push(bid);
                 }
                 // Release the request — all private blocks must be freed.
@@ -74,7 +80,9 @@ fn eviction_under_full_pressure_no_panic() {
 
     // Fill to 48/50 (96%).
     for i in 0..48u32 {
-        let _ = mgr.allocate(u64::from(i + 1), TokenRange::new(0, 64)).unwrap();
+        let _ = mgr
+            .allocate(u64::from(i + 1), TokenRange::new(0, 64))
+            .unwrap();
     }
     assert_eq!(mgr.used_blocks(), 48);
 

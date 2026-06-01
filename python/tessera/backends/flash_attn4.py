@@ -29,7 +29,7 @@ class FlashAttn4Backend(MlaAttentionBackend):
     def is_available(self) -> bool:
         return False
 
-    def forward(self, *args: object, **kwargs: object) -> torch.Tensor:  # noqa: ARG002
+    def forward(self, *args: object, **kwargs: object) -> torch.Tensor:
         msg = (
             "FlashAttention-4 backend is not implemented in Sprint 0. "
             f"Track progress at {_TRACKING_URL}."

@@ -35,7 +35,7 @@ def build_page_tables(
     Returns:
         ``[batch, max_blocks]`` int32 tensor on ``device``.
     """
-    import torch  # noqa: PLC0415
+    import torch
 
     max_blocks = max((len(row) for row in block_ids), default=0)
     batch = len(block_ids)
@@ -67,7 +67,7 @@ class FlashMLABackend(MlaAttentionBackend):
         if self._flash_mla is not None:
             return self._flash_mla
         try:
-            import flash_mla  # type: ignore[import-not-found]  # noqa: PLC0415
+            import flash_mla  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - environment-dependent
             msg = (
                 "flash_mla is not installed. Install with `pip install flash-mla` or build "
@@ -110,13 +110,13 @@ class FlashMLABackend(MlaAttentionBackend):
             ``[batch, num_heads, d_h]`` BF16 output.
         """
         kernel = self._load()
-        cfg    = self._config
+        cfg = self._config
 
         # ── Shape assertions (catch mismatches before they become CUDA errors) ────────
-        batch      = q_absorbed.shape[0]
-        num_heads  = cfg.model.num_heads
-        d_c        = cfg.model.latent_dim
-        d_r        = cfg.model.rope_key_dim
+        batch = q_absorbed.shape[0]
+        num_heads = cfg.model.num_heads
+        d_c = cfg.model.latent_dim
+        d_r = cfg.model.rope_key_dim
 
         if q_absorbed.shape != (batch, num_heads, d_c):
             msg = (
@@ -144,13 +144,12 @@ class FlashMLABackend(MlaAttentionBackend):
         # ── Scale ────────────────────────────────────────────────────────────────────
         scale = cfg.kernel.softmax_scale
         if scale is None:
-            scale = 1.0 / (d_c ** 0.5)
+            scale = 1.0 / (d_c**0.5)
 
         # ── FP8 scale forwarding ──────────────────────────────────────────────────────
         kwargs: dict[str, Any] = {}
-        if cfg.block.ckv_dtype == "fp8_e4m3":
-            if fp8_scales is not None:
-                kwargs["fp8_scales"] = fp8_scales
+        if cfg.block.ckv_dtype == "fp8_e4m3" and fp8_scales is not None:
+            kwargs["fp8_scales"] = fp8_scales
             # If fp8_scales is None with FP8 dtype we pass nothing: FlashMLA defaults to 1.0.
             # This is correct for testing; production must calibrate (ADR-0007).
 
@@ -179,7 +178,7 @@ class FlashMLABackend(MlaAttentionBackend):
         from ``self._config.fp8_scales``. Use this when you don't want to manage scale
         tensors manually.
         """
-        import torch as _torch  # noqa: PLC0415
+        import torch as _torch
 
         fp8_scales: torch.Tensor | None = None
         if self._config.block.ckv_dtype == "fp8_e4m3" and self._config.fp8_scales is not None:

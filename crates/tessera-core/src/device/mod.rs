@@ -12,7 +12,7 @@ use std::fmt::Debug;
 
 mod cpu_mock;
 #[cfg(feature = "cuda")]
-mod cuda;
+pub mod cuda;
 pub mod disk;
 
 pub use cpu_mock::CpuMockBackend;

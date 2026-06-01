@@ -47,11 +47,11 @@ def reference_absorbed_mla(
 
     # Upcast to FP32 for accumulation stability (avoids the vLLM April-2026 precision
     # regression documented in the playbook §9 and WS9 needle-in-haystack tests).
-    qA = q_abs.float()   # [B, H, d_c]
+    qA = q_abs.float()  # [B, H, d_c]
     qR = q_rope.float()  # [B, H, d_r]
-    C  = c_kv.float()    # [B, S, d_c]
+    C = c_kv.float()  # [B, S, d_c]
     KR = k_rope.float()  # [B, S, d_r]
-    WV = W_UV.float()    # [H, d_h, d_c]
+    WV = W_UV.float()  # [H, d_h, d_c]
 
     # Content attention scores: q_absorbed · c_kv^T  →  [B, H, S]
     content_scores = torch.einsum("bhc,bsc->bhs", qA, C) * scale
@@ -59,8 +59,8 @@ def reference_absorbed_mla(
     # RoPE attention scores: q_rope · k_rope^T (MQA: k_rope broadcast over heads) → [B, H, S]
     rope_scores = torch.einsum("bhd,bsd->bhs", qR, KR) * scale
 
-    scores = content_scores + rope_scores          # [B, H, S]
-    attn   = torch.softmax(scores, dim=-1)         # [B, H, S]
+    scores = content_scores + rope_scores  # [B, H, S]
+    attn = torch.softmax(scores, dim=-1)  # [B, H, S]
 
     # Weighted sum over c_kv: attn · c_kv  →  [B, H, d_c]
     weighted_ckv = torch.einsum("bhs,bsc->bhc", attn, C)

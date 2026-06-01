@@ -12,17 +12,21 @@ on:
 jobs:
   cargo-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: dtolnay/rust-toolchain@1.85.0
       - name: Install cargo-audit
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
-      - run: cargo audit
+      # cargo-audit does not read deny.toml's `[advisories].ignore`, so the protobuf
+      # advisory has to be re-declared here. See deny.toml for the justification.
+      - run: cargo audit --ignore RUSTSEC-2024-0437
 
   cargo-deny:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -31,6 +35,7 @@ jobs:
 
   pip-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

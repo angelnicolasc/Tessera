@@ -26,12 +26,12 @@ from tessera import _native
 from tessera.cross_agent import CrossAgentShareTable
 from tessera.segment_index import SegmentIndex, hash_ckv_bytes
 
-
 # ─────────────────────────── helpers ─────────────────────────────────────────
+
 
 def _make_manager(n_blocks: int = 256) -> _native.BlockManager:
     scheme = _native.CompressionScheme.mla_latent(32, 8)
-    cfg    = _native.MlaBlockConfig(scheme, 4, 64, _native.CkvDtype.Bf16, 0)
+    cfg = _native.MlaBlockConfig(scheme, 4, 64, _native.CkvDtype.Bf16, 0)
     return _native.BlockManager(cfg, n_blocks * cfg.total_block_bytes())
 
 
@@ -42,6 +42,7 @@ def _make_ckv(seed: int, blocks: int = 4, d_c: int = 32, layers: int = 4) -> np.
 
 
 # ─────────────────────────── tests ───────────────────────────────────────────
+
 
 @pytest.mark.integration
 class TestE2eCpuSharing:
@@ -84,7 +85,7 @@ class TestE2eCpuSharing:
 
     def test_share_table_reflects_both_owners(self):
         """(b) After explicit sharing, share table lists both agents as owners."""
-        mgr   = _make_manager()
+        mgr = _make_manager()
         share = CrossAgentShareTable()
 
         agent_a, agent_b = 10, 20
@@ -107,7 +108,7 @@ class TestE2eCpuSharing:
 
     def test_release_request_a_leaves_blocks_for_b(self):
         """(c) Releasing agent A's request does not free blocks still held by agent B."""
-        mgr   = _make_manager()
+        mgr = _make_manager()
         share = CrossAgentShareTable()
 
         agent_a, agent_b = 100, 200
@@ -148,19 +149,20 @@ class TestE2eCpuSharing:
 
         B, H, S, d_c, d_r, d_h = 1, 2, 64, 32, 8, 32
         torch.manual_seed(7)
-        q_abs  = torch.randn(B, H, d_c)
+        q_abs = torch.randn(B, H, d_c)
         q_rope = torch.randn(B, H, d_r)
         c_kv_a = torch.randn(B, S, d_c)
-        c_kv_b = c_kv_a.clone()           # identical content — simulates block sharing
+        c_kv_b = c_kv_a.clone()  # identical content — simulates block sharing
         k_rope = torch.randn(B, S, d_r)
-        W_UV   = torch.randn(H, d_h, d_c)
-        scale  = 1.0 / math.sqrt(d_c)
+        W_UV = torch.randn(H, d_h, d_c)
+        scale = 1.0 / math.sqrt(d_c)
 
         out_a = reference_absorbed_mla(q_abs, q_rope, c_kv_a, k_rope, W_UV, scale)
         out_b = reference_absorbed_mla(q_abs, q_rope, c_kv_b, k_rope, W_UV, scale)
 
         torch.testing.assert_close(
-            out_a, out_b,
+            out_a,
+            out_b,
             msg="attention output must be bit-identical for shared c_kv content",
         )
 
@@ -171,10 +173,10 @@ class TestE2eCpuSegmentIndex:
 
     def test_segment_index_exact_hit_returns_canonical(self):
         """Layer 1 exact hash lookup returns the canonical block sealed by the first agent."""
-        mgr   = _make_manager()
+        mgr = _make_manager()
         index = SegmentIndex(latent_dim=32, num_layers=4)
 
-        agent_a, agent_b = 1, 2
+        agent_a, _agent_b = 1, 2
         d_c, layers, block_size = 32, 4, 64
 
         # Build a deterministic c_kv array and hash it.

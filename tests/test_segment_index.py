@@ -55,9 +55,7 @@ async def test_hnsw_approximate_match_returns_inserted_block(
 
 
 @pytest.mark.asyncio
-async def test_remove_clears_both_layers(
-    native: object, small_ckv: np.ndarray
-) -> None:
+async def test_remove_clears_both_layers(native: object, small_ckv: np.ndarray) -> None:
     del native
     idx = SegmentIndex(latent_dim=32, num_layers=4)
     h = hash_ckv_bytes(small_ckv)
@@ -71,9 +69,7 @@ async def test_remove_clears_both_layers(
 
 
 @pytest.mark.asyncio
-async def test_latency_budget_zero_yields_miss(
-    native: object, small_ckv: np.ndarray
-) -> None:
+async def test_latency_budget_zero_yields_miss(native: object, small_ckv: np.ndarray) -> None:
     """A budget below floor must always time out, returning None safely."""
     del native
     idx = SegmentIndex(latent_dim=32, num_layers=4, latency_budget_us=1)

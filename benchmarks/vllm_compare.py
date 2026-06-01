@@ -44,7 +44,7 @@ def _require_torch() -> None:
 
 
 def _detect_device() -> str:
-    import torch  # noqa: PLC0415
+    import torch
 
     return "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -53,6 +53,7 @@ def _detect_device() -> str:
 # Tessera side
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _run_tessera(
     n_agents: int,
     doc_blocks: int,
@@ -60,16 +61,16 @@ def _run_tessera(
     block_size: int,
 ) -> dict[str, float]:
     """Run the Tessera allocator simulation and return timing + memory stats."""
-    from tessera import _native  # noqa: PLC0415
+    from tessera import _native
 
     total_blocks_budget = n_agents * (doc_blocks + sys_blocks_per_agent) + 128
-    scheme  = _native.CompressionScheme.mla_latent(512, 64)   # DS-V3 dims
-    config  = _native.MlaBlockConfig(scheme, 28, block_size, _native.CkvDtype.Bf16, 0)
+    scheme = _native.CompressionScheme.mla_latent(512, 64)  # DS-V3 dims
+    config = _native.MlaBlockConfig(scheme, 28, block_size, _native.CkvDtype.Bf16, 0)
     manager = _native.BlockManager(config, total_blocks_budget * config.total_block_bytes())
 
     block_bytes_mb = config.total_block_bytes() / (1024 * 1024)
-    n_allocs   = 0
-    n_seals    = 0
+    n_allocs = 0
+    n_seals = 0
     dedup_hits = 0
 
     t_alloc_start = time.perf_counter()
@@ -107,24 +108,25 @@ def _run_tessera(
     t_seal_end = time.perf_counter()
 
     alloc_s = t_alloc_end - t_alloc_start
-    seal_s  = t_seal_end - t_alloc_end
-    unique_blocks   = n_seals - dedup_hits
-    kv_mb_tessera   = unique_blocks * block_bytes_mb
-    kv_mb_naive     = n_seals * block_bytes_mb
+    seal_s = t_seal_end - t_alloc_end
+    unique_blocks = n_seals - dedup_hits
+    kv_mb_tessera = unique_blocks * block_bytes_mb
+    kv_mb_naive = n_seals * block_bytes_mb
 
     return {
-        "alloc_throughput":   n_allocs / alloc_s,
-        "seal_throughput":    n_seals  / seal_s,
-        "dedup_hit_rate":     dedup_hits / n_seals if n_seals else 0.0,
-        "kv_mb_tessera":      kv_mb_tessera,
-        "kv_mb_naive":        kv_mb_naive,
-        "kv_savings_ratio":   kv_mb_naive / kv_mb_tessera if kv_mb_tessera > 0 else 0.0,
+        "alloc_throughput": n_allocs / alloc_s,
+        "seal_throughput": n_seals / seal_s,
+        "dedup_hit_rate": dedup_hits / n_seals if n_seals else 0.0,
+        "kv_mb_tessera": kv_mb_tessera,
+        "kv_mb_naive": kv_mb_naive,
+        "kv_savings_ratio": kv_mb_naive / kv_mb_tessera if kv_mb_tessera > 0 else 0.0,
     }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # vLLM shim side
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _run_vllm_shim(
     n_agents: int,
@@ -141,7 +143,7 @@ def _run_vllm_shim(
     not the real vLLM C++ allocator, which is faster.  The gap shows Tessera's
     FFI overhead is within an acceptable range.
     """
-    blocks: dict[int, int] = {}   # block_id → ref_count
+    blocks: dict[int, int] = {}  # block_id → ref_count
     next_id = 0
     n_allocs = 0
 
@@ -159,10 +161,10 @@ def _run_vllm_shim(
 
     return {
         "alloc_throughput": n_allocs / alloc_s,
-        "seal_throughput":  float("nan"),   # vLLM does not have a seal step
-        "dedup_hit_rate":   0.0,            # no block-content dedup in stock vLLM
-        "kv_mb_tessera":    float("nan"),
-        "kv_mb_naive":      float("nan"),
+        "seal_throughput": float("nan"),  # vLLM does not have a seal step
+        "dedup_hit_rate": 0.0,  # no block-content dedup in stock vLLM
+        "kv_mb_tessera": float("nan"),
+        "kv_mb_naive": float("nan"),
         "kv_savings_ratio": float("nan"),
     }
 
@@ -171,13 +173,14 @@ def _run_vllm_shim(
 # Entry point
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     _require_torch()
     device = _detect_device()
 
-    n_agents   = 16
-    doc_blocks = 128   # 8192 tokens ÷ 64
-    sys_blocks = 8     # 512  tokens ÷ 64
+    n_agents = 16
+    doc_blocks = 128  # 8192 tokens ÷ 64
+    sys_blocks = 8  # 512  tokens ÷ 64
     block_size = 64
 
     print(f"Tessera vs vLLM block allocator throughput  (device={device})")
@@ -186,17 +189,21 @@ def main() -> None:
     print()
 
     tessera = _run_tessera(n_agents, doc_blocks, sys_blocks, block_size)
-    vllm    = _run_vllm_shim(n_agents, doc_blocks, sys_blocks, block_size)
+    vllm = _run_vllm_shim(n_agents, doc_blocks, sys_blocks, block_size)
 
     rows = [
-        ("Metric",                   "Tessera",                                  "vLLM shim"),
-        ("-" * 28,                   "-" * 16,                                   "-" * 16),
-        ("Alloc throughput (ops/s)",  f"{tessera['alloc_throughput']:>12,.0f}",   f"{vllm['alloc_throughput']:>12,.0f}"),
-        ("Seal throughput (ops/s)",   f"{tessera['seal_throughput']:>12,.0f}",    "         n/a"),
-        ("Dedup hit rate",            f"{tessera['dedup_hit_rate']:>12.3f}",      f"{'0.000':>12}"),
-        ("KV cache MB (dedup)",       f"{tessera['kv_mb_tessera']:>12.2f}",       "         n/a"),
-        ("KV cache MB (naive)",       f"{tessera['kv_mb_naive']:>12.2f}",         "         n/a"),
-        ("KV savings ratio",          f"{tessera['kv_savings_ratio']:>11.2f}×",   "         n/a"),
+        ("Metric", "Tessera", "vLLM shim"),
+        ("-" * 28, "-" * 16, "-" * 16),
+        (
+            "Alloc throughput (ops/s)",
+            f"{tessera['alloc_throughput']:>12,.0f}",
+            f"{vllm['alloc_throughput']:>12,.0f}",
+        ),
+        ("Seal throughput (ops/s)", f"{tessera['seal_throughput']:>12,.0f}", "         n/a"),
+        ("Dedup hit rate", f"{tessera['dedup_hit_rate']:>12.3f}", f"{'0.000':>12}"),
+        ("KV cache MB (dedup)", f"{tessera['kv_mb_tessera']:>12.2f}", "         n/a"),
+        ("KV cache MB (naive)", f"{tessera['kv_mb_naive']:>12.2f}", "         n/a"),
+        ("KV savings ratio", f"{tessera['kv_savings_ratio']:>11.2f}×", "         n/a"),
     ]
     col_w = [28, 16, 16]
     for row in rows:

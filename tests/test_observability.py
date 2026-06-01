@@ -14,9 +14,7 @@ from typing import Any
 
 import pytest
 
-from tessera import _native
 from tessera.observability import _TRACER_CACHE, get_tracer, init_tracing, span
-
 
 # ──────────── helpers ─────────────────────────────────────────────────────────
 
@@ -77,7 +75,9 @@ def test_span_noop_when_tracer_not_set() -> None:
 
 def test_mock_exporter_records_span_names() -> None:
     """InMemorySpanExporter captures span names emitted through observability.span()."""
-    otel_sdk = pytest.importorskip("opentelemetry.sdk.trace", reason="opentelemetry-sdk not installed")
+    otel_sdk = pytest.importorskip(
+        "opentelemetry.sdk.trace", reason="opentelemetry-sdk not installed"
+    )
     in_memory = pytest.importorskip(
         "opentelemetry.sdk.trace.export.in_memory_span_exporter",
         reason="opentelemetry-sdk not installed",
@@ -135,7 +135,7 @@ def test_allocator_emits_no_exception_with_mock_tracer() -> None:
     allocator = TesseraBlockAllocator(cfg)
 
     # allocate_mutable_block fires tessera.allocate span.
-    block = allocator.allocate_mutable_block(None, device=None)
+    allocator.allocate_mutable_block(None, device=None)
     assert "tessera.allocate" in recorded
 
     _clear_tracer_cache()

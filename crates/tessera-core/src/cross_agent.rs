@@ -40,7 +40,10 @@ impl CrossAgentShareTable {
     /// Register `req_id` as an additional owner of `block_id`. Caller must have already
     /// incremented the block's ref-count in the block manager.
     pub fn add_share(&self, req_id: u64, block_id: BlockId) {
-        self.block_to_owners.entry(block_id).or_default().push(req_id);
+        self.block_to_owners
+            .entry(block_id)
+            .or_default()
+            .push(req_id);
         self.req_to_blocks.entry(req_id).or_default().push(block_id);
         self.total_shared_refs.fetch_add(1, Ordering::Relaxed);
         crate::metrics::SHARING_RATE.set(self.sharing_rate());
@@ -53,7 +56,11 @@ impl CrossAgentShareTable {
     /// Note: the *block manager's* ref-count must still be decremented for **every** entry in
     /// the returned vector; the share table doesn't reach into the block manager itself.
     pub fn release_request(&self, req_id: u64) -> Vec<BlockId> {
-        let blocks = self.req_to_blocks.remove(&req_id).map(|(_, v)| v).unwrap_or_default();
+        let blocks = self
+            .req_to_blocks
+            .remove(&req_id)
+            .map(|(_, v)| v)
+            .unwrap_or_default();
         let mut to_free = Vec::with_capacity(blocks.len());
         for block_id in blocks {
             let now_empty = {
@@ -75,7 +82,9 @@ impl CrossAgentShareTable {
 
     /// Look up all current owners of `block_id`. Returns `None` if the block is not shared.
     pub fn owners(&self, block_id: BlockId) -> Option<Vec<u64>> {
-        self.block_to_owners.get(&block_id).map(|e| e.value().clone())
+        self.block_to_owners
+            .get(&block_id)
+            .map(|e| e.value().clone())
     }
 
     /// Distinct shared blocks tracked.

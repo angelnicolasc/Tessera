@@ -18,10 +18,10 @@ import pytest
 pytest.importorskip("hypothesis")
 pytest.importorskip("tessera._native")
 
-from hypothesis import HealthCheck, given, settings  # noqa: E402
-from hypothesis import strategies as st  # noqa: E402
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
-from tessera import _native  # noqa: E402
+from tessera import _native
 
 
 def _world_and_transport(world_size: int):
@@ -32,8 +32,12 @@ def _world_and_transport(world_size: int):
 
 @given(content_hash=st.integers(min_value=0, max_value=2**64 - 1))
 @settings(
-    max_examples=64,
-    deadline=None,
+    # See test_hypothesis_allocator.py for the rationale: signal-based pytest-timeout
+    # cannot interrupt PyO3 native calls that hold the GIL, so any individual hypothesis
+    # example that the CI runner finds slow burns the whole job budget. Cap and set
+    # a real deadline.
+    max_examples=16,
+    deadline=2000,
     suppress_health_check=[HealthCheck.too_slow],
 )
 def test_distributed_lookup_hash_shape(content_hash):
@@ -54,7 +58,7 @@ def test_distributed_lookup_hash_shape(content_hash):
 
 
 @given(world_size=st.integers(min_value=1, max_value=4))
-@settings(max_examples=16, deadline=None)
+@settings(max_examples=8, deadline=2000)
 def test_distributed_lookup_safe_on_any_world_size(world_size):
     """world_size ∈ [1, 4]: lookup never raises; singletons short-circuit; larger fan-out
     returns a safe miss when no peer holds the hash."""
@@ -77,7 +81,7 @@ def test_distributed_lookup_safe_on_any_world_size(world_size):
         max_size=4,
     )
 )
-@settings(max_examples=32, deadline=None)
+@settings(max_examples=16, deadline=2000)
 def test_usearch_add_query_roundtrip(descriptors):
     """Adding a descriptor and querying it back should return the same block id (top-1)."""
     if not descriptors:

@@ -16,7 +16,10 @@ use tessera_core::{
 
 fn small_cfg() -> MlaBlockConfig {
     MlaBlockConfig::new(
-        CompressionScheme::MlaLatent { latent_dim: 32, rope_key_dim: 8 },
+        CompressionScheme::MlaLatent {
+            latent_dim: 32,
+            rope_key_dim: 8,
+        },
         4,
         64,
         CkvDtype::Bf16,
@@ -102,7 +105,11 @@ async fn transfer_request_moves_all_owned_blocks() {
         .unwrap();
     assert_eq!(moved, 3);
     assert_eq!(src.used_blocks(), 0, "source must release after transfer");
-    assert_eq!(dst.used_blocks(), 3, "destination must hold the imported blocks");
+    assert_eq!(
+        dst.used_blocks(),
+        3,
+        "destination must hold the imported blocks"
+    );
     assert_eq!(dst_peer.received.lock().len(), 3);
 }
 
@@ -133,7 +140,9 @@ async fn payload_roundtrip_preserves_content_hash() {
     let bid = mgr.allocate(1, TokenRange::new(0, 64)).unwrap();
     mgr.fill_primary_test_pattern(bid, 0xC3).unwrap();
     let payload = mgr.export_payload(bid).unwrap();
-    let bid2 = mgr.import_payload(2, TokenRange::new(0, 64), &payload).unwrap();
+    let bid2 = mgr
+        .import_payload(2, TokenRange::new(0, 64), &payload)
+        .unwrap();
     let payload2 = mgr.export_payload(bid2).unwrap();
     assert_eq!(payload.c_kv, payload2.c_kv);
     assert_eq!(payload.k_rope, payload2.k_rope);
