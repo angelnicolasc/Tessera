@@ -166,7 +166,7 @@ jobs:
           echo "CC=gcc-12" >> "$GITHUB_ENV"
           echo "CXX=g++-12" >> "$GITHUB_ENV"
       - name: Install CUDA toolkit 12.4
-        uses: Jimver/cuda-toolkit@v0.2.18
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: "12.4.0"
           method: network
