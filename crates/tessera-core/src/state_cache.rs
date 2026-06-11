@@ -253,7 +253,9 @@ mod tests {
         let sc = StateCache::new(cfg(), CpuMockBackend::new()).unwrap();
         let (swa1, tail1) = sc.allocate_for_request(7).unwrap();
         let (swa2, tail2) = sc.allocate_for_request(7).unwrap();
-        assert_eq!((swa1.raw, tail1.raw), (swa2.raw, tail2.raw));
+        // Sprint 5.1: DevicePtr is now a `(region, offset, len)` handle. Identity
+        // comparison via the derived PartialEq still works.
+        assert_eq!((swa1, tail1), (swa2, tail2));
         assert_eq!(sc.used(), 1);
         assert!(sc.release_request(7));
         assert_eq!(sc.used(), 0);

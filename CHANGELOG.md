@@ -9,6 +9,75 @@ managed by [release-please](https://github.com/googleapis/release-please) — ad
 
 ## [Unreleased]
 
+## [0.6.1-sprint5.1] — 2026-06-11
+
+**Hardening Cycle.** Closes the four Critical findings and two highest-ROI High findings from
+the Sprint 5 security audit. No new features; no API additions beyond the C3/H2 atomic
+write. Wire compatibility intact for Rust callers; one PyO3 method removed (`fp8_scales_ptr`)
+and one added (`write_fp8_scales`). See ADRs 0025-0027.
+
+### Added
+
+- **C1** — `seal()` byte-equality verification on `content_index` hash match. Neutralises
+  xxh3 collision attacks against the cross-agent share table. New
+  `tessera_dedup_hash_collisions_total` Prometheus counter — operators should alert on
+  spikes. ADR-0026. Test:
+  `crates/tessera-core/tests/seal_collision_verification.rs`.
+- **C3 / H2** — `TesseraBlockManager::write_fp8_scales(block_id, &[f32])` writes FP8 scale
+  factors atomically under the block manager's read lock. Replaces the prior PyO3
+  `fp8_scales_ptr` + Python `ctypes.memmove` pattern which had a TOCTOU window: eviction
+  could recycle the block between the pointer fetch and the memmove. ADR-0027.
+- **C4** — `DiskBackend` Sprint 5.1 hardening:
+  - Region files created with Unix mode `0o600` (owner-only); KV cache content is a proxy
+    of the prompt and was world-readable on the prior `0o644` default.
+  - `root` canonicalised at construction; subsequent symlink swaps cannot redirect region
+    writes.
+  - New `DiskBackend::with_allowed_roots(root, strategy, &[allowed_prefix])` constructor
+    for multi-tenant deployments — rejects roots outside the allowlist.
+  - `tessera-disk-manifest.json` written on every `flush_all` with `(region_index, kind,
+    size, xxh3_checksum)` per region. On reopen, region files whose checksum, size or
+    kind disagree with the manifest are quarantined (buffer zeroed; stale file
+    overwritten on next flush). New `DiskBackend::quarantined_regions()` accessor for
+    observability.
+- **C4 / H1** — `DevicePtr` refactored to a handle: `(region: u32, offset: u64, len:
+  u64)`. Cross-region aliasing is structurally impossible; `locate()` is O(1). The
+  public `raw: usize` field is gone. Backends that need a kernel-side address implement
+  `DeviceBackend::device_address(ptr) -> Option<usize>`. ADR-0025.
+- **H5** — Docker workflow ships SLSA-3 build provenance, an SBOM attestation, and a
+  GitHub-native build-provenance attestation per image push. Stale `sprint2` tag dropped
+  in favour of semver / sha / branch / tag families.
+
+### Changed
+
+- `CudaXxh3Hasher` renamed to `CudaXxh3HasherStub`, marked `#[doc(hidden)]` and
+  `#[deprecated]`. No longer re-exported from `content_hash`. The default `new()`
+  constructor panics with a message pointing at the trivially-collidable stub semantics;
+  the test-only constructor is named
+  `new_acknowledging_stub_collision_risk(backend)`.
+- `cow_fork()` now bumps the source block's ref-count for the duration of the copy and
+  uses the checked `primary_ptr` / `rope_ptr` accessors throughout. A race where eviction
+  recycled the source mid-copy could previously corrupt the new block; the source is now
+  pinned (`ref_count > 1` is never evicted, ADR-0010) and the copy returns
+  `UnknownBlock` cleanly if the source disappears between calls.
+- `seal()` install path uses `DashMap::entry().or_insert()` for atomic content-index
+  registration; closes the prior get/insert race (audit H3) where two threads with
+  identical content could both install distinct entries.
+- `DiskBackend::drop` logs flush errors at `tracing::error!` level instead of silently
+  swallowing them.
+
+### Removed
+
+- `BlockManager.fp8_scales_ptr(block_id) -> int | None` — replaced by atomic
+  `write_fp8_scales`. Python callers should migrate.
+
+### Security
+
+- xxh3 collision attack surface against cross-agent dedup: closed (C1, ADR-0026).
+- Python TOCTOU on FP8 scale writes: closed (C3, ADR-0027).
+- Multi-tenant DiskBackend leak via shared root + 0o644 perms: closed (C4).
+- DevicePtr aliasing footgun: closed (C4 / H1, ADR-0025).
+- Docker supply-chain unattested: closed (H5).
+
 ## [0.6.0-sprint5] — 2026-05-27
 
 **DeepSeek-V4 Compliance.** Brings Tessera's block manager into structural alignment with

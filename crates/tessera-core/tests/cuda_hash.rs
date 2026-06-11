@@ -1,18 +1,21 @@
-//! CudaXxh3Hasher stub tests (WS8 / TD-002).
+//! `CudaXxh3HasherStub` exercises (WS8 / TD-002).
 //!
-//! Verifies the `hash_device` override path compiles and runs without panicking.
-//! Tests in this file are either feature-gated (`#[cfg(feature = "cuda")]`) or skipped
-//! at runtime (`#[ignore = "requires CUDA device"]`).
+//! Sprint 5.1: the stub is `#[deprecated]`, the default `new()` constructor panics, and the
+//! struct is no longer re-exported from `content_hash`. Tests construct it only via the
+//! `new_acknowledging_stub_collision_risk` constructor — the rest of the codebase cannot
+//! accidentally wire it into a production block manager.
 //!
 //! The CPU-reachable tests verify the stub's placeholder hash is deterministic and non-zero
 //! for non-trivial inputs. The GPU test is marked `#[ignore]` and runs only in cloud burst.
+
+#![allow(deprecated)]
 
 #[cfg(feature = "cuda")]
 mod cuda_hash_tests {
     use std::sync::Arc;
 
-    use tessera_core::content_hash::{ContentHasher, CudaXxh3Hasher};
-    use tessera_core::device::cuda::CudaBackend;
+    use tessera_core::content_hash::ContentHasher;
+    use tessera_core::device::cuda::{CudaBackend, CudaXxh3HasherStub};
 
     /// Verifies the stub hash is deterministic (same input → same output across calls).
     #[test]
@@ -62,12 +65,13 @@ mod cuda_hash_tests {
         assert_ne!(h.hash(&[0xABu8; 128]), h.hash(&[0xCDu8; 128]));
     }
 
-    /// Exercises `CudaXxh3Hasher::hash_device` on a real CUDA device. Skipped in CI.
+    /// Exercises `CudaXxh3HasherStub::hash_device` on a real CUDA device. Skipped in CI.
     #[test]
     #[ignore = "requires CUDA device — run with `cargo test -F cuda -- --ignored` on cloud GPU"]
     fn cuda_hasher_executes_hash_device_without_panic() {
         let backend = Arc::new(CudaBackend::new(0).expect("CUDA device 0"));
-        let hasher = CudaXxh3Hasher::new(Arc::clone(&backend));
+        let hasher =
+            CudaXxh3HasherStub::new_acknowledging_stub_collision_risk(Arc::clone(&backend));
 
         // Allocate a small region, fill with pattern, hash it.
         use tessera_core::device::{DeviceBackend, RegionKind};

@@ -105,20 +105,31 @@ def test_usearch_index_repr_after_add() -> None:
     assert "len=1" in r
 
 
-def test_fp8_scales_ptr_none_for_bf16() -> None:
-    """fp8_scales_ptr returns None when ckv_dtype is BF16."""
+def test_write_fp8_scales_noop_for_bf16() -> None:
+    """Sprint 5.1: write_fp8_scales is a no-op when the config has no FP8 region."""
     mgr = _make_manager(8)
     bid = mgr.allocate(1, 0, 64)
-    assert mgr.fp8_scales_ptr(bid) is None
+    # Must not raise — BF16 configs silently no-op so callers can use a single code path.
+    mgr.write_fp8_scales(bid, [1.0] * 4)
 
 
-def test_fp8_scales_ptr_returns_int_for_fp8() -> None:
-    """fp8_scales_ptr returns an int (pointer as usize) when ckv_dtype is FP8."""
+def test_write_fp8_scales_succeeds_for_fp8() -> None:
+    """Sprint 5.1: write_fp8_scales accepts a per-layer list under FP8 configs."""
     scheme = _native.CompressionScheme.mla_latent(32, 8)
     cfg = _native.MlaBlockConfig(scheme, 4, 64, _native.CkvDtype.Fp8E4m3, 0)
     mgr = _native.BlockManager(cfg, 16 * cfg.total_block_bytes())
     bid = mgr.allocate(1, 0, 64)
-    ptr = mgr.fp8_scales_ptr(bid)
-    assert ptr is not None
-    assert isinstance(ptr, int)
-    assert ptr > 0
+    # 4 layers in the config — must match.
+    mgr.write_fp8_scales(bid, [0.001, 0.002, 0.003, 0.004])
+
+
+def test_write_fp8_scales_rejects_wrong_length() -> None:
+    """Sprint 5.1: write_fp8_scales validates len(scales) == num_layers."""
+    scheme = _native.CompressionScheme.mla_latent(32, 8)
+    cfg = _native.MlaBlockConfig(scheme, 4, 64, _native.CkvDtype.Fp8E4m3, 0)
+    mgr = _native.BlockManager(cfg, 16 * cfg.total_block_bytes())
+    bid = mgr.allocate(1, 0, 64)
+    import pytest
+
+    with pytest.raises(ValueError):
+        mgr.write_fp8_scales(bid, [0.001, 0.002])  # only 2 scales for 4 layers

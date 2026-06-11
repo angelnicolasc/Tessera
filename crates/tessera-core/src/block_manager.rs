@@ -599,21 +599,76 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
     /// Compute the content hash, register it in the content index, and dedup against any
     /// existing identical block. The caller should swap to [`SealOutcome::canonical_block`]
     /// going forward — if `was_dedup` is `true`, `block_id` has been freed.
+    ///
+    /// **Sprint 5.1 hardening (ADR-0026)**: a matching `content_index` entry triggers a
+    /// **byte-equality check** between the candidate block and the canonical block before
+    /// dedup is committed. xxh3 is not collision-resistant against adversaries (crafted
+    /// collisions are well-known), so the hash only fast-paths the lookup; the dedup
+    /// authorisation requires identical bytes. On hash collision the candidate is
+    /// installed as a fresh entry — the share table keeps two distinct blocks with the
+    /// same hash, and a future seal of the same content collapses onto whichever installs
+    /// first. The dedup-rate metric degrades; the security invariant holds.
     pub fn seal(&self, block_id: BlockId) -> Result<SealOutcome> {
         let hash = self.hash_primary(block_id)?;
         if let Some(existing) = self.content_index.get(&hash) {
             let canonical = *existing.value();
-            // Increment the canonical block's ref-count to keep the caller alive.
-            self.increment_ref(canonical)?;
-            // Free the duplicate; it was never added to content_index (content_hash == 0),
-            // so free_block_internal correctly skips the index removal path.
-            self.free_block_internal(block_id)?;
-            crate::metrics::EXACT_DEDUP_HITS.inc();
+            drop(existing);
+            // Byte-verify before committing to dedup. xxh3 is non-cryptographic; an
+            // adversary that can submit content can craft collisions against the
+            // canonical block and (without this verification) be handed a pointer to it.
+            if self.blocks_have_equal_primary(block_id, canonical)? {
+                self.increment_ref(canonical)?;
+                self.free_block_internal(block_id)?;
+                crate::metrics::EXACT_DEDUP_HITS.inc();
+                return Ok(SealOutcome {
+                    canonical_block: canonical,
+                    content_hash: hash,
+                    was_dedup: true,
+                });
+            }
+            crate::metrics::DEDUP_HASH_COLLISIONS.inc();
+            tracing::warn!(
+                hash,
+                candidate = ?block_id,
+                canonical = ?canonical,
+                "seal: hash match but bytes differ — installing as fresh block (xxh3 collision)"
+            );
+            // Fall through: install the candidate as a fresh, non-aliased block. The
+            // content_index entry already points at `canonical`; we don't overwrite it.
+            {
+                let mut blocks = self.blocks.write();
+                let meta = blocks
+                    .get_mut(&block_id)
+                    .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
+                meta.content_hash = hash;
+            }
             return Ok(SealOutcome {
-                canonical_block: canonical,
+                canonical_block: block_id,
                 content_hash: hash,
-                was_dedup: true,
+                was_dedup: false,
             });
+        }
+        // Atomic install: use DashMap::entry to avoid the get/insert race where two
+        // identical seals both pass the get and both insert (silently breaking the dedup
+        // invariant — see audit H3).
+        let inserted = self.content_index.entry(hash).or_insert(block_id);
+        let canonical = *inserted.value();
+        drop(inserted);
+        if canonical != block_id {
+            // Another thread won the race with an identical (or hash-colliding) block.
+            // Verify bytes before deduping.
+            if self.blocks_have_equal_primary(block_id, canonical)? {
+                self.increment_ref(canonical)?;
+                self.free_block_internal(block_id)?;
+                crate::metrics::EXACT_DEDUP_HITS.inc();
+                return Ok(SealOutcome {
+                    canonical_block: canonical,
+                    content_hash: hash,
+                    was_dedup: true,
+                });
+            }
+            // Race + hash collision — install fresh, keep both.
+            crate::metrics::DEDUP_HASH_COLLISIONS.inc();
         }
         {
             let mut blocks = self.blocks.write();
@@ -622,7 +677,6 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
                 .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
             meta.content_hash = hash;
         }
-        self.content_index.insert(hash, block_id);
         Ok(SealOutcome {
             canonical_block: block_id,
             content_hash: hash,
@@ -630,10 +684,93 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
         })
     }
 
+    /// Compare the primary (`c_kv`) bytes of two blocks for equality. Returns `false` if
+    /// either block has been evicted between caller's reference and this call (treats a
+    /// missing block as "not equal").
+    fn blocks_have_equal_primary(&self, a: BlockId, b: BlockId) -> Result<bool> {
+        let n = usize::try_from(self.config.primary_block_bytes())
+            .map_err(|_| TesseraError::InvalidConfig("primary bytes overflow usize".into()))?;
+        let ptr_a = match self.primary_ptr(a) {
+            Some(p) => p,
+            None => return Ok(false),
+        };
+        let ptr_b = match self.primary_ptr(b) {
+            Some(p) => p,
+            None => return Ok(false),
+        };
+        let bytes_a = self
+            .backend
+            .read_bytes(ptr_a, n)
+            .map_err(TesseraError::Backend)?;
+        let bytes_b = self
+            .backend
+            .read_bytes(ptr_b, n)
+            .map_err(TesseraError::Backend)?;
+        Ok(bytes_a == bytes_b)
+    }
+
+    /// **Sprint 5.1 hardening** — write per-layer FP8 scale factors for `block_id`
+    /// atomically under the block manager's read lock. Replaces the prior pattern of
+    /// returning a raw `usize` to Python for `ctypes.memmove`, which had a TOCTOU race
+    /// between the pointer fetch and the memmove (eviction could recycle the block; the
+    /// memmove would land in another tenant's data — see audit C3).
+    ///
+    /// The number of `scales` provided must match the number of layers in the config.
+    /// No-op when FP8 is not active for the active config.
+    pub fn write_fp8_scales(&self, block_id: BlockId, scales: &[f32]) -> Result<()> {
+        let expected_len = self.config.num_layers as usize;
+        if scales.len() != expected_len {
+            return Err(TesseraError::InvalidConfig(format!(
+                "write_fp8_scales: expected {} scales (one per layer), got {}",
+                expected_len,
+                scales.len()
+            )));
+        }
+        // Hold the read lock for the duration of the write so the block cannot be evicted
+        // (eviction takes the write lock).
+        let blocks = self.blocks.read();
+        if !blocks.contains_key(&block_id) {
+            return Err(TesseraError::UnknownBlock(block_id.raw()));
+        }
+        let Some(base) = self.fp8_scales_base else {
+            // No FP8 region for this config — silently no-op so callers can use a single
+            // code path across MLA-BF16 and MLA-FP8 configs.
+            return Ok(());
+        };
+        let ptr = base.offset(u64::from(block_id.raw()) * self.config.fp8_scale_block_bytes());
+        // Re-interpret &[f32] as &[u8] via to_le_bytes streaming. f32::to_le_bytes
+        // produces a deterministic 4-byte little-endian encoding, which matches what
+        // PyTorch / numpy use for `.float32`.
+        let mut bytes = Vec::with_capacity(scales.len() * 4);
+        for s in scales {
+            bytes.extend_from_slice(&s.to_le_bytes());
+        }
+        let expected_bytes = usize::try_from(self.config.fp8_scale_block_bytes())
+            .map_err(|_| TesseraError::InvalidConfig("fp8 scale bytes overflow usize".into()))?;
+        if bytes.len() > expected_bytes {
+            return Err(TesseraError::InvalidConfig(format!(
+                "write_fp8_scales: encoded {} bytes exceed region {}",
+                bytes.len(),
+                expected_bytes
+            )));
+        }
+        self.backend
+            .write_bytes(ptr, &bytes)
+            .map_err(TesseraError::Backend)?;
+        drop(blocks);
+        Ok(())
+    }
+
     /// Fork a private writable copy of `block_id` for `new_req_id`. The new block is fully
     /// independent: mutations to it do not propagate to the original. The original block's
     /// ref-count is not decremented here — callers should `free` the original after the fork
     /// when they no longer hold their reference.
+    ///
+    /// **Sprint 5.1 hardening**: the source pointers are resolved through the checked
+    /// [`Self::primary_ptr`] / [`Self::rope_ptr`] / [`Self::fp8_scales_ptr`] accessors. If
+    /// the source block has been evicted between the caller's reference and the memcpy
+    /// the fork fails with [`TesseraError::UnknownBlock`] rather than silently reading
+    /// from recycled memory (audit H2).
     pub fn cow_fork(&self, block_id: BlockId, new_req_id: u64) -> Result<BlockId> {
         let token_range = {
             let blocks = self.blocks.read();
@@ -642,36 +779,54 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
                 .ok_or(TesseraError::UnknownBlock(block_id.raw()))?
                 .token_range
         };
-        let new_id = self.allocate(new_req_id, token_range)?;
-        // Copy primary region.
-        self.backend
-            .memcpy(
-                self.primary_ptr_unchecked(block_id),
-                self.primary_ptr_unchecked(new_id),
-                self.config.primary_block_bytes(),
-            )
-            .map_err(TesseraError::Backend)?;
-        // Copy rope region.
-        if self.config.rope_block_bytes() > 0 {
+        // Pin the source against eviction for the duration of the fork. evict_one will
+        // not touch a block whose ref_count > 1.
+        let _src_ref = self.increment_ref(block_id)?;
+        let new_id = match self.allocate(new_req_id, token_range) {
+            Ok(id) => id,
+            Err(e) => {
+                let _ = self.free(block_id);
+                return Err(e);
+            }
+        };
+        let result = (|| -> Result<()> {
+            let src_primary = self
+                .primary_ptr(block_id)
+                .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
+            let dst_primary = self
+                .primary_ptr(new_id)
+                .ok_or(TesseraError::UnknownBlock(new_id.raw()))?;
             self.backend
-                .memcpy(
-                    self.rope_ptr_unchecked(block_id),
-                    self.rope_ptr_unchecked(new_id),
-                    self.config.rope_block_bytes(),
-                )
+                .memcpy(src_primary, dst_primary, self.config.primary_block_bytes())
                 .map_err(TesseraError::Backend)?;
-        }
-        // Copy fp8 scale region if present.
-        if let Some(scales_ptr_src) = self.fp8_scales_ptr(block_id) {
-            let scales_ptr_dst = self.fp8_scales_ptr(new_id).expect("dst alloc matches src");
-            self.backend
-                .memcpy(
-                    scales_ptr_src,
-                    scales_ptr_dst,
-                    self.config.fp8_scale_block_bytes(),
-                )
-                .map_err(TesseraError::Backend)?;
-        }
+            if self.config.rope_block_bytes() > 0 {
+                let src_rope = self
+                    .rope_ptr(block_id)
+                    .ok_or(TesseraError::UnknownBlock(block_id.raw()))?;
+                let dst_rope = self
+                    .rope_ptr(new_id)
+                    .ok_or(TesseraError::UnknownBlock(new_id.raw()))?;
+                self.backend
+                    .memcpy(src_rope, dst_rope, self.config.rope_block_bytes())
+                    .map_err(TesseraError::Backend)?;
+            }
+            if let Some(scales_ptr_src) = self.fp8_scales_ptr(block_id) {
+                let scales_ptr_dst = self
+                    .fp8_scales_ptr(new_id)
+                    .ok_or(TesseraError::UnknownBlock(new_id.raw()))?;
+                self.backend
+                    .memcpy(
+                        scales_ptr_src,
+                        scales_ptr_dst,
+                        self.config.fp8_scale_block_bytes(),
+                    )
+                    .map_err(TesseraError::Backend)?;
+            }
+            Ok(())
+        })();
+        // Release the source pin regardless of outcome.
+        let _ = self.free(block_id);
+        result?;
         crate::metrics::COW_FORKS.inc();
         Ok(new_id)
     }

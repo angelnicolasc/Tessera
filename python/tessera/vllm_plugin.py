@@ -21,7 +21,6 @@ current prefill proceeds immediately without waiting.
 from __future__ import annotations
 
 import asyncio
-import ctypes
 from typing import TYPE_CHECKING, Any
 
 from tessera.config import TesseraConfig
@@ -250,22 +249,17 @@ class TesseraBlockAllocator:
     def _write_fp8_scales(self, block_id: int) -> None:
         """Write per-layer FP8 scale factors into the block's scale region.
 
-        On the CPU mock backend, ``fp8_scales_ptr`` always returns ``None`` so this is a no-op.
-        On a CUDA backend the ptr is a device memory address; we memcpy the scale array in.
+        Sprint 5.1 hardening: this now calls ``BlockManager.write_fp8_scales`` which holds
+        the block manager's read lock for the duration of the write — the prior
+        ``fp8_scales_ptr`` + ``ctypes.memmove`` pattern had a TOCTOU race where eviction
+        could recycle the block between the pointer fetch and the memmove (audit C3 /
+        ADR-0027). No-op on BF16 configs.
         """
         if self._fp8_scales is None:
             return
-        ptr = self._manager.fp8_scales_ptr(block_id)
-        if ptr is None:
-            return
-        import numpy as np
-
         num_layers = self._config.model.num_layers
-        scales = np.array(
-            [self._fp8_scales.get(i, 1.0) for i in range(num_layers)],
-            dtype=np.float32,
-        )
-        ctypes.memmove(ptr, scales.ctypes.data, scales.nbytes)
+        scales = [float(self._fp8_scales.get(i, 1.0)) for i in range(num_layers)]
+        self._manager.write_fp8_scales(block_id, scales)
 
     async def _async_hnsw_add(
         self, block_id: int, content_hash: int, c_kv: NDArray[np.floating]
