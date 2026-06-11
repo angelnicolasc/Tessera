@@ -26,11 +26,11 @@ tessera-index = { path = "crates/tessera-index", version = "0.1.0" }
 
 # Core
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 tracing = "0.1"
 
 # Concurrency primitives
-dashmap = "5.5"
+dashmap = "6.2"
 parking_lot = "0.12"
 
 # Hashing
@@ -48,7 +48,7 @@ toml = "0.8"
 # through every metric call site in the workspace (RUSTSEC-2024-0437 is the protobuf 2.28
 # recursion CVE in prometheus's pull-encoder; we don't ingest external protobuf, so
 # the advisory is documented & ignored in deny.toml).
-prometheus = "0.13"
+prometheus = "0.14"
 lazy_static = "1.5"
 
 # ANN
@@ -57,21 +57,21 @@ usearch = "2.12"
 # Python bindings
 # 0.24+ closes RUSTSEC-2025-0020 (PyString::from_object overflow). Source already uses the
 # Bound<'py, T> API so the bump is mechanical.
-pyo3 = { version = "0.24", features = ["extension-module", "abi3-py311"] }
-numpy = "0.24"
+pyo3 = { version = "0.28", features = ["extension-module", "abi3-py311"] }
+numpy = "0.28"
 
 # Test / bench
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 proptest = "1.5"
-rand = "0.8"
-rand_chacha = "0.3"
+rand = "0.10"
+rand_chacha = "0.10"
 
 # Optional CUDA
 # cudarc 0.12 ships `driver` only; the `runtime` feature was added in 0.13 (renamed
 # from the old combined `cuda` feature). Tessera's CUDA backend in
 # `crates/tessera-core/src/device/cuda.rs` only touches the driver API
 # (`cudarc::driver::{CudaDevice, CudaSlice, ...}`), so the runtime feature is not needed.
-cudarc = { version = "0.12", default-features = false, features = ["cuda-12040", "driver"] }
+cudarc = { version = "0.19", default-features = false, features = ["cuda-12040", "driver"] }
 
 # Async runtime + async traits (Sprint 3: RankTransport, DistributedSegmentIndex)
 tokio = { version = "1.40", features = ["sync", "macros", "rt-multi-thread", "time"] }
@@ -82,10 +82,10 @@ futures = "0.3"
 # bridge was written for the 0.27 API set (SpanExporter::builder().with_tonic(),
 # trace::Builder::with_resource, etc.). 0.26 lacks both — pin to the matched 0.27
 # ecosystem.
-tracing-opentelemetry = "0.28"
-opentelemetry = "0.27"
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
+tracing-opentelemetry = "0.33"
+opentelemetry = "0.32"
+opentelemetry_sdk = { version = "0.32", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.32", features = ["grpc-tonic"] }
 # tracing-subscriber is used by observability::init_otlp_tracing under the otel-rust
 # feature; it must be a regular (optional) dep, not just dev.
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
