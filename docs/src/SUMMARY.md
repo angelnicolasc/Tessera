@@ -63,3 +63,6 @@
 - [ADR-0022 — Mixed precision per region](adr/0022-mixed-precision-per-region.md)
 - [ADR-0023 — State Cache](adr/0023-state-cache.md)
 - [ADR-0024 — Disk backend (V4 on-disk KV)](adr/0024-disk-backend.md)
+- [ADR-0025 — Handle-based DevicePtr](adr/0025-handle-based-device-ptr.md)
+- [ADR-0026 — seal() byte verification](adr/0026-seal-byte-verification.md)
+- [ADR-0027 — Atomic FP8 scale write](adr/0027-atomic-fp8-scale-write.md)

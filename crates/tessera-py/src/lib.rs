@@ -425,12 +425,18 @@ impl PyBlockManager {
         self.inner.utilization()
     }
 
-    /// Return the raw device pointer (as `usize`) to the FP8 scale region for `block_id`.
-    /// Returns `None` if FP8 is not active for this config or the block is unknown.
-    fn fp8_scales_ptr(&self, block_id: u32) -> Option<usize> {
+    /// **Sprint 5.1 hardening** — atomically write per-layer FP8 scale factors for
+    /// ``block_id``. Replaces the prior ``fp8_scales_ptr`` accessor that returned a raw
+    /// device address for Python-side ``ctypes.memmove`` — that had a TOCTOU window where
+    /// eviction could recycle the block between the pointer fetch and the memmove
+    /// (audit C3).
+    ///
+    /// ``scales`` length must equal the configured number of layers. No-op when the active
+    /// config has no FP8 scale region (BF16 path); callers can use a single code path.
+    fn write_fp8_scales(&self, block_id: u32, scales: Vec<f32>) -> PyResult<()> {
         self.inner
-            .fp8_scales_ptr(BlockId(block_id))
-            .map(|ptr| ptr.raw)
+            .write_fp8_scales(BlockId(block_id), &scales)
+            .map_err(map_err)
     }
 
     /// This manager's rank within its world (Sprint 3 / ADR-0014). For singleton-world

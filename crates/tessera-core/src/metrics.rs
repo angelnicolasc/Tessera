@@ -34,6 +34,17 @@ lazy_static! {
     )
     .expect("failed to register tessera_exact_dedup_hits_total");
 
+    /// Sprint 5.1: number of times a `seal()` saw a hash match in `content_index` but the
+    /// byte-equality check rejected the dedup. Non-zero values indicate either an organic
+    /// 64-bit collision (statistically rare) or an adversarial attempt to exploit xxh3's
+    /// lack of collision resistance to gain a pointer into another tenant's block. Spike
+    /// alerts on this counter; see ADR-0026.
+    pub static ref DEDUP_HASH_COLLISIONS: Counter = register_counter!(
+        "tessera_dedup_hash_collisions_total",
+        "seal() candidates that hash-matched but failed byte verification (xxh3 collisions)"
+    )
+    .expect("failed to register tessera_dedup_hash_collisions_total");
+
     /// Total number of blocks matched via HNSW approximate lookup (Python side).
     pub static ref HNSW_MATCH_HITS: Counter = register_counter!(
         "tessera_hnsw_match_hits_total",

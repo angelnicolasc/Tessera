@@ -23,6 +23,11 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Sprint 5.1 hardening (audit H5): SLSA-3 build provenance attestation requires
+      # `id-token: write` (OIDC) and `attestations: write` for the GitHub-hosted
+      # attestation store.
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@v4
@@ -49,12 +54,21 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Sprint 5.1: dropped the stale `sprint2` tag that the workflow had been
+          # publishing for three sprints. Tags now reflect actual semver / sha.
           tags: |
-            type=raw,value=sprint2
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
+      # Sprint 5.1 hardening (audit H5): produce SLSA-3 build provenance and an SBOM
+      # alongside the image so downstream consumers can verify integrity. `provenance:
+      # mode=max` + `sbom: true` instruct buildx to attach both as image attestations.
       - name: Build and push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -63,6 +77,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      # Sprint 5.1: GitHub-native build provenance attestation, separate from the buildx
+      # attestation above. Two attestations beat one: buildx's lives next to the image in
+      # the registry, GitHub's lives in the project's transparency log.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       - name: Smoke-test the pushed image
         run: |
