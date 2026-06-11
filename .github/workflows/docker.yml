@@ -51,7 +51,7 @@ jobs:
 
       - name: Extract Docker metadata (tags and labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           # Sprint 5.1: dropped the stale `sprint2` tag that the workflow had been
