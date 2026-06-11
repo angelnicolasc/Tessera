@@ -57,6 +57,15 @@ usearch = "2.12"
 # Python bindings
 # 0.24+ closes RUSTSEC-2025-0020 (PyString::from_object overflow). Source already uses the
 # Bound<'py, T> API so the bump is mechanical.
+#
+# RUSTSEC-2026-0176 (out-of-bounds read in PyList/PyTuple Iterator::nth / nth_back) is fixed
+# in pyo3 0.29.0, but the `numpy` crate (latest 0.28.0, 2026-02-08) still pins pyo3 ^0.28 —
+# upgrading pyo3 in isolation produces a `links = "python"` conflict between pyo3-ffi 0.29
+# and 0.28. Until numpy ≥ 0.29 ships, the advisory is ignored in deny.toml with the
+# reachability justification: tessera-py never calls `Iterator::nth` / `nth_back` on a
+# `PyList` or `PyTuple` iterator (verified by grep against the crate source — we use
+# `Vec<T>` extraction which goes through `iter().collect()`, not arbitrary-index access).
+# Tracked as TD-043; the bump is mechanical once numpy 0.29 lands.
 pyo3 = { version = "0.24", features = ["extension-module", "abi3-py311"] }
 numpy = "0.24"
 

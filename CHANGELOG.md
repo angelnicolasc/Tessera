@@ -78,6 +78,15 @@ and one added (`write_fp8_scales`). See ADRs 0025-0027.
 - DevicePtr aliasing footgun: closed (C4 / H1, ADR-0025).
 - Docker supply-chain unattested: closed (H5).
 
+### Known advisory ignores
+
+- **RUSTSEC-2026-0176** (pyo3 0.24, fixed in 0.29.0 published 2026-06-11): ignored in
+  `deny.toml` + `security.yml` with a non-reachability justification. The vulnerable
+  code path is `BoundListIterator::nth` / `nth_back` on `PyList`/`PyTuple` iterators with
+  user-controlled `n`. `tessera-py` makes no such call (verified by grep over the crate
+  source). Bumping pyo3 in isolation fails today because numpy 0.28 still pins pyo3
+  ^0.28. Tracked as TD-043; drops the moment numpy 0.29 ships.
+
 ## [0.6.0-sprint5] — 2026-05-27
 
 **DeepSeek-V4 Compliance.** Brings Tessera's block manager into structural alignment with
