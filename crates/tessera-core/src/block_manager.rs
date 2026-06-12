@@ -460,6 +460,15 @@ impl<B: DeviceBackend, H: ContentHasher> TesseraBlockManager<B, H> {
         Ok(())
     }
 
+    /// **Sprint 5.1**: number of active reservations currently held by this manager. This is
+    /// the per-instance count, distinct from the process-global Prometheus gauge
+    /// `tessera_reservations_active{rank=…}` which is shared across all managers in the
+    /// process — tests should prefer this accessor when asserting per-destination leak
+    /// invariants under cargo-test's per-binary parallelism.
+    pub fn active_reservations(&self) -> usize {
+        self.reservations.len()
+    }
+
     /// Consume one slot from a reservation. Called from `import_payload` when accepting an
     /// incoming pushed block. Returns `Ok(())` whether or not the reservation entry exists
     /// (allowing a non-reserved import path for backward compatibility with the Sprint 3

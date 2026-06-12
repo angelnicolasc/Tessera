@@ -11,6 +11,16 @@ ignore = [
     # tightens with_label_values<V> signature in a way that touches every metric call site
     # and is out of scope for this CI-unblock PR — follow-up).
     { id = "RUSTSEC-2024-0437", reason = "prometheus exposition path does not parse external protobuf" },
+    # pyo3 0.24 - out-of-bounds read in BoundListIterator::nth / nth_back and
+    # BoundTupleIterator::nth / nth_back when caller supplies a large user-controlled `n`.
+    # Fix is in pyo3 0.29.0 (released 2026-06-11) but the `numpy` crate is at 0.28.0
+    # (2026-02-08) and still pins pyo3 ^0.28 — bumping pyo3 alone fails to link due to
+    # the `links = "python"` rule. Reachability: tessera-py never calls .nth() or
+    # .nth_back() on a PyList or PyTuple iterator (verified by grep over
+    # crates/tessera-py/src/lib.rs); all Python list arguments are converted via
+    # `Vec<T>: FromPyObject` which uses `iter().collect()`, never user-controlled indexing.
+    # Tracked as TD-043 in DEVLOG; the bump is mechanical once numpy >= 0.29 lands.
+    { id = "RUSTSEC-2026-0176", reason = "tessera-py does not call Iterator::nth/nth_back on PyList/PyTuple iterators (verified by grep); waiting for numpy 0.29 to upgrade pyo3 to 0.29" },
 ]
 
 [licenses]

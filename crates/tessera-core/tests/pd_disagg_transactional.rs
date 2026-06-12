@@ -204,14 +204,14 @@ async fn mid_stream_push_failure_releases_reservation_and_preserves_source() {
     }
     let src_used_before = src.used_blocks();
 
-    // `RESERVATIONS_ACTIVE{rank="r1"}` is a process-global prometheus gauge shared with
-    // every other test in this binary that touches rank 1. Capture the baseline before the
-    // transfer so the assertion measures *this test's* delta rather than the absolute
-    // counter (cargo-test parallelism + lazy_static metrics broke the absolute-zero check
-    // on Windows/macOS runners).
-    let active_before = tessera_core::metrics::RESERVATIONS_ACTIVE
-        .with_label_values(&["r1"])
-        .get();
+    // Sprint 5.1: assert the per-destination reservation count directly rather than the
+    // process-global `RESERVATIONS_ACTIVE{rank="r1"}` gauge. The gauge is shared with
+    // every other test in this binary that touches a rank-1 manager — under cargo-test
+    // (and especially cargo-llvm-cov, where instrumentation widens timing windows) the
+    // tests interleave and a delta over the global gauge is not deterministic. The
+    // destination manager's own `active_reservations()` is per-instance and unaffected
+    // by parallel tests.
+    let active_before = dst.active_reservations();
 
     let result = src
         .transfer_request_to_rank(req_id, RankId(1), &transport)
@@ -221,14 +221,14 @@ async fn mid_stream_push_failure_releases_reservation_and_preserves_source() {
     assert_eq!(src.used_blocks(), src_used_before);
     // No blocks landed at destination.
     assert_eq!(dst.used_blocks(), 0);
-    // No active reservations leaked at destination (release_reservation was called on abort,
-    // OR the reserve itself failed under ALL_DROPS — either way, no leftovers).
-    let active = tessera_core::metrics::RESERVATIONS_ACTIVE
-        .with_label_values(&["r1"])
-        .get();
-    assert!(
-        (active - active_before).abs() < f64::EPSILON,
-        "no reservations should leak on abort; before={active_before}, after={active}"
+    // No active reservations leaked at destination. ALL_DROPS makes both `reserve_slots`
+    // and `release_reservation` calls fail at the LatencyInjector — the contract is that
+    // a failed reserve never reaches the destination, so the destination's reservation
+    // count must be unchanged regardless of which leg of the protocol failed first.
+    let active_after = dst.active_reservations();
+    assert_eq!(
+        active_after, active_before,
+        "no reservations should leak on abort; before={active_before}, after={active_after}"
     );
 }
 
