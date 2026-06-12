@@ -4,7 +4,7 @@ description = "MLA-aware KV block manager core: allocation, content-addressed de
 # Inlined (rather than `version.workspace = true`) so release-please can find and
 # bump `[package].version` directly — its rust strategy parses the literal string and
 # bails with `value at path package.version is not tagged` on the workspace-inherit form.
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true

@@ -1,5 +1,5 @@
 {
-  "crates/tessera-core": "0.1.0",
-  "crates/tessera-index": "0.1.0",
-  "crates/tessera-py": "0.1.0"
+  "crates/tessera-core": "0.2.0",
+  "crates/tessera-index": "0.2.0",
+  "crates/tessera-py": "0.2.0"
 }
