@@ -2,7 +2,7 @@
 name = "tessera-index"
 description = "Pluggable ANN segment index for Tessera. Trait + usearch HNSW implementation."
 # Inlined for release-please; see comment in crates/tessera-core/Cargo.toml.
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true

@@ -2,7 +2,7 @@
 name = "tessera-py"
 description = "PyO3 bindings exposing the Tessera Rust core to Python (module: tessera._native)."
 # Inlined for release-please; see comment in crates/tessera-core/Cargo.toml.
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
