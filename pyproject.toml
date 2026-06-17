@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.7",
-    "numpy>=1.26",
+    "numpy>=2.4.6",
     "xxhash>=3.4",
     "usearch>=2.12",
 ]
