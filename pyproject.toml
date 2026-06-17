@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: System :: Hardware",
 ]
 dependencies = [
-    "pydantic>=2.7",
+    "pydantic>=2.13.4",
     "numpy>=1.26",
     "xxhash>=3.4",
     "usearch>=2.12",
