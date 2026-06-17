@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 torch = ["torch>=2.4"]
-vllm = ["vllm>=0.6"]
+vllm = ["vllm>=0.22.0"]
 flashinfer = ["flashinfer>=0.2"]
 flash-mla = ["flash-mla"]
 observability = [
